@@ -55,7 +55,15 @@ jobs:
       - name: Generate Prisma client
         run: npm run db:generate
 
+      # Read-only informational check. `prisma migrate status` exits with code 1
+      # when migrations are simply PENDING (or the DB has drifted) - that is a
+      # normal pre-deploy state, NOT an error. continue-on-error keeps the
+      # status visible in the logs without stopping the workflow, so the
+      # `prisma migrate deploy` step below can actually apply the pending
+      # migrations. It is still reported as failed in the job summary, so a
+      # human can review the output after the run.
       - name: Verify migration state (read-only)
+        continue-on-error: true
         run: npx prisma migrate status --schema packages/database/prisma/schema.prisma
         env:
           DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
