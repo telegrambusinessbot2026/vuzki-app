@@ -1,0 +1,39 @@
+{
+  "name": "@vuzki/database",
+  "version": "1.0.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./client": {
+      "types": "./dist/client.d.ts",
+      "default": "./dist/client.js"
+    },
+    "./seed": "./seed/index.ts"
+  },
+  "prisma": {
+    "seed": "tsx seed/index.ts"
+  },
+  "scripts": {
+    "build": "prisma generate && tsc -p tsconfig.json",
+    "generate": "prisma generate",
+    "push": "prisma db push",
+    "migrate": "prisma migrate dev",
+    "studio": "prisma studio",
+    "seed": "tsx seed/index.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.14.0",
+    "@vuzki/shared": "*",
+    "@vuzki/utils": "*"
+  },
+  "devDependencies": {
+    "prisma": "^5.14.0",
+    "tsx": "^4.9.0",
+    "typescript": "^5.4.5"
+  }
+}

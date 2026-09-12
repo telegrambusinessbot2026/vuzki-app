@@ -1,0 +1,172 @@
+name: vuzki
+
+# =====================================================================
+# VUZKI - production-oriented docker compose.
+#
+# Local development / demo:
+#   docker compose -f infrastructure/docker/docker-compose.yml up -d postgres redis
+#   docker compose -f infrastructure/docker/docker-compose.yml up --build
+#
+# Full app services (api/web/admin/worker) expect external integrations
+# (PAYMENT_PROVIDER, RTC_PROVIDER, STORAGE_PROVIDER, AI_PROVIDER, OTP_PROVIDER)
+# to be supplied via the environment file. Copy infrastructure/../.env.example
+# to .env and set values. NEVER commit real .env.
+#
+# For managed cloud deployments, Postgres & Redis are typically provisioned
+# externally (RDS, ElastiCache) and reached via DATABASE_URL / REDIS_URL.
+# =====================================================================
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: vuzki-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-vuzki}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-vuzki}
+    ports: ["5432:5432"] # remove in production; connect privately
+    volumes:
+      - vuzki_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-vuzki}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    deploy:
+      resources:
+        limits: { cpus: "2.0", memory: 2G }
+
+  redis:
+    image: redis:7-alpine
+    container_name: vuzki-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:?REDIS_PASSWORD is required}"]
+    ports: ["6379:6379"] # remove in production; connect privately
+    volumes:
+      - vuzki_redisdata:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    deploy:
+      resources:
+        limits: { cpus: "1.0", memory: 1G }
+
+  migrations:
+    image: vuzki-api
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/Dockerfile.api
+    container_name: vuzki-migrations-run
+    restart: "no"
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+    command: ["node", "-e", "const {execSync}=require('child_process'); execSync('npx --prefix /app/packages/database prisma migrate deploy --schema /app/packages/database/prisma/schema.prisma',{stdio:'inherit'})"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    image: vuzki-api
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/Dockerfile.api
+    container_name: vuzki-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      API_PORT: 4000
+      API_HOST: 0.0.0.0
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL:-redis://:${REDIS_PASSWORD}@redis:6379}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET is required}
+      SESSION_SECRET: ${SESSION_SECRET:-${JWT_SECRET}}
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://app.vuzki.app,https://admin.vuzki.app,https://vuzki.app}
+      WEB_URL: ${WEB_URL:-https://app.vuzki.app}
+      ADMIN_URL: ${ADMIN_URL:-https://admin.vuzki.app}
+      WEBSITE_URL: ${WEBSITE_URL:-https://vuzki.app}
+      PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-demo}
+      RTC_PROVIDER: ${RTC_PROVIDER:-webrtc}
+      STORAGE_PROVIDER: ${STORAGE_PROVIDER:-local}
+      AI_PROVIDER: ${AI_PROVIDER:-off}
+      OTP_PROVIDER: ${OTP_PROVIDER:-dev}
+      CURRENCY: ${CURRENCY:-INR}
+      BUILD_ID: ${BUILD_ID:-dev}
+    ports: ["4000:4000"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+    deploy:
+      resources:
+        limits: { cpus: "2.0", memory: 1G }
+
+  worker:
+    image: vuzki-worker
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/Dockerfile.worker
+    container_name: vuzki-worker
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL:-redis://:${REDIS_PASSWORD}@redis:6379}
+      RETENTION_ENABLED: ${RETENTION_ENABLED:-true}
+      BUILD_ID: ${BUILD_ID:-dev}
+    deploy:
+      resources:
+        limits: { cpus: "1.0", memory: 512M }
+
+  web:
+    image: vuzki-web
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/Dockerfile.web
+      args:
+        NEXT_PUBLIC_API_URL: ${WEB_API_URL:-https://api.vuzki.app/api/v1}
+        NEXT_PUBLIC_SOCKET_URL: ${WEB_SOCKET_URL:-https://api.vuzki.app}
+    container_name: vuzki-web
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports: ["${WEB_PORT:-3000}:3000"]
+    deploy:
+      resources:
+        limits: { cpus: "2.0", memory: 1G }
+
+  admin:
+    image: vuzki-admin
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/Dockerfile.admin
+      args:
+        NEXT_PUBLIC_API_URL: ${ADMIN_API_URL:-https://api.vuzki.app/api/v1}
+    container_name: vuzki-admin
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports: ["${ADMIN_PORT:-3001}:3001"]
+    deploy:
+      resources:
+        limits: { cpus: "1.0", memory: 512M }
+
+volumes:
+  vuzki_pgdata:
+  vuzki_redisdata:
+  vuzki_uploads:

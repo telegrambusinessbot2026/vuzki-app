@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+.next/
+out/
+build/
+.turbo/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+.env.production
+
+# Misc
+.DS_Store
+*.log
+coverage/
+.vscode/
+.idea/
+*.tsbuildinfo
+
+# Secrets - never commit
+*.pem
+.env.*
+!*/.env.example
+!

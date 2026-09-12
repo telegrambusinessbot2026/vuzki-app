@@ -1,0 +1,1002 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// AUTH & USER
+// ============================================================
+
+model User {
+  id               String    @id @default(cuid())
+  email            String?   @unique
+  emailVerified    Boolean   @default(false)
+  phone            String?   @unique
+  phoneVerified    Boolean   @default(false)
+  passwordHash     String?
+  authProvider     String    @default("local") // local | google | apple
+  providerId       String?
+  role             String    @default("USER") // USER | CREATOR | ADMIN
+  status           String    @default("ACTIVE") // AccountStatus
+  username         String    @unique
+  displayName      String
+  avatarUrl        String?
+  bannerUrl        String?
+  gender           String    @default("PREFER_NOT_TO_SAY")
+  dateOfBirth      DateTime?
+  countryCode      String?
+  region           String?
+  bio              String?
+  onboardingStep   String    @default("NONE") // OnboardingStep
+  verificationStatus String @default("NONE")
+  isVerified       Boolean   @default(false)
+  premiumTier      String    @default("FREE") // PremiumTier
+  premiumExpiresAt DateTime?
+  onlineStatus     Boolean   @default(false)
+  lastActiveAt     DateTime  @default(now())
+  isCreator        Boolean   @default(false)
+  creatorStatus    String?   @default("OFFLINE") // CreatorAvailabilityStatus
+  referralCode     String?   @unique
+  referredById     String?
+  lastDailyReward  DateTime?
+  dailyStreak      Int       @default(0)
+  latitude         Float?
+  longitude        Float?
+  locationUpdatedAt DateTime?
+  lastLoginAt      DateTime?
+
+  profile          Profile?
+  preferences      ProfilePreferences?
+  interests        ProfileInterest[]
+  languages        ProfileLanguage[]
+  photos           Photo[]
+  devices          Session[]
+  wallet           Wallet?
+  walletTransactions WalletTransaction[]
+  referralsMade    Referral[]   @relation("referralsMade")
+  referredBy       Referral[]   @relation("referredBy")
+  likesGiven       Like[]       @relation("likesGiven")
+  likesReceived    Like[]       @relation("likesReceived")
+  superLikesGiven  SuperLike[]  @relation("superLikesGiven")
+  superLikesReceived SuperLike[] @relation("superLikesReceived")
+  matchesA         Match[]      @relation("matchesA")
+  matchesB         Match[]      @relation("matchesB")
+  conversationsA   Conversation[] @relation("conversationA")
+  conversationsB   Conversation[] @relation("conversationB")
+  messagesSent     Message[]    @relation("messagesSent")
+  messagesReceived Message[]    @relation("messagesReceived")
+  callsInitiated   Call[]       @relation("callsInitiated")
+  callsReceived    Call[]       @relation("callsReceived")
+  callParticipants CallParticipant[]
+  giftsSent        GiftTransaction[] @relation("giftsSent")
+  giftsReceived    GiftTransaction[] @relation("giftsReceived")
+  creator          CreatorProfile?
+  creatorApplications CreatorApplication[]
+  creatorEarnings  CreatorEarning[]
+  withdrawals      Withdrawal[]
+  subscriptions    Subscription[]
+  notifications    Notification[]
+  reportsFiled     Report[]     @relation("reportsFiled")
+  reportsReceived  Report[]     @relation("reportsReceived")
+  blocksMade       Block[]      @relation("blocksMade")
+  blocksReceived   Block[]      @relation("blocksReceived")
+  moderationActions ModerationAction[]
+  boosts           Boost[]
+  rewards          Reward[]
+  auditLogs        AuditLog[]
+
+  userRisk         UserRisk?
+  moderationCases  ModerationCase[]
+  appeals          Appeal[]
+  restrictions     UserRestriction[]
+  securityEvents   SecurityEvent[]
+  verifications    Verification[]
+  fraudFlags       FraudFlag[]
+  contentFlags     ContentFlag[]
+  accountDeletion  AccountDeletion?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  @@index([status])
+  @@index([isCreator])
+  @@index([premiumTier])
+  @@index([onlineStatus])
+  @@index([countryCode])
+  @@index([createdAt])
+}
+
+model Profile {
+  id                String @id @default(cuid())
+  userId            String @unique
+  user              User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ageRangeFrom      Int    @default(18)
+  ageRangeTo        Int    @default(50)
+  genderPreference  String @default("all")
+  maxDistanceKm     Int    @default(50)
+  showOnlineStatus  Boolean @default(true)
+  discoveryEnabled  Boolean @default(true)
+  publicProfileEnabled Boolean @default(true)
+  onlinePreference  Boolean @default(false)
+  verifiedPreference Boolean @default(false)
+  showAge           Boolean @default(true)
+  showLocation      Boolean @default(true)
+  languages         String[] @default([])
+  interests         String[] @default([])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ProfilePreferences {
+  id               String @id @default(cuid())
+  userId           String @unique
+  user             User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ageRangeFrom     Int    @default(18)
+  ageRangeTo       Int    @default(50)
+  genderPreference String @default("all")
+  maxDistanceKm    Int    @default(50)
+  showOnlineStatus Boolean @default(true)
+  discoveryEnabled Boolean @default(true)
+  publicProfileEnabled Boolean @default(true)
+  onlinePreference Boolean @default(false)
+  verifiedPreference Boolean @default(false)
+  // PRIVACY & SAFETY CONTROLS
+  whoCanMessage   String @default("everyone") // everyone | verified | nobody
+  whoCanCall      String @default("everyone") // everyone | verified | creators | followers | nobody
+  whoCanMatch     String @default("everyone")
+  contactRequests String @default("everyone")
+  locationVisibility String @default("normal") // normal | city_only | none
+  allowLocationDiscovery Boolean @default(false)
+  showExactLocation Boolean @default(false)
+  nearByEnabled   Boolean @default(false)
+  onlineVisibility String @default("everyone") // everyone | premium | nobody
+  showReadReceipts Boolean @default(true)
+  allowPushNotifications Boolean @default(true)
+  allowEmailNotifications Boolean @default(true)
+  allowMarketing Boolean @default(false)
+  showProfileInDiscovery Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ProfileInterest {
+  id         String @id @default(cuid())
+  userId     String
+  user       User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name       String
+  @@unique([userId, name])
+  @@index([name])
+}
+
+model ProfileLanguage {
+  id         String @id @default(cuid())
+  userId     String
+  user       User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  code       String
+  @@unique([userId, code])
+  @@index([code])
+}
+
+model Photo {
+  id         String @id @default(cuid())
+  userId     String
+  user       User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  url        String
+  thumbnailUrl String?
+  order      Int    @default(0)
+  isPrimary  Boolean @default(false)
+  createdAt  DateTime @default(now())
+}
+
+// ============================================================
+// AUTH SESSIONS
+// ============================================================
+
+model Session {
+  id          String  @id @default(cuid())
+  userId      String
+  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshToken String @unique
+  deviceName  String?
+  deviceType  String?
+  ipAddress   String?
+  userAgent   String?
+  expiresAt   DateTime
+  isActive    Boolean @default(true)
+  createdAt   DateTime @default(now())
+  lastUsedAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Otp {
+  id          String  @id @default(cuid())
+  identifier  String
+  code        String? // plaintext code (only for legacy records; new records store codeHash only)
+  codeHash    String  // SHA-256 hash of the OTP code (for hashed verification)
+  purpose     String
+  expiresAt   DateTime
+  consumed    Boolean @default(false)
+  attempts    Int     @default(0)
+  createdAt   DateTime @default(now())
+  @@index([identifier])
+  @@index([codeHash])
+}
+
+// ============================================================
+// MATCHING / LIKES
+// ============================================================
+
+model Like {
+  id        String   @id @default(cuid())
+  senderId  String
+  sender    User     @relation("likesGiven", fields: [senderId], references: [id], onDelete: Cascade)
+  receiverId String
+  receiver  User     @relation("likesReceived", fields: [receiverId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  @@unique([senderId, receiverId])
+  @@index([receiverId])
+}
+
+model SuperLike {
+  id        String   @id @default(cuid())
+  senderId  String
+  sender    User     @relation("superLikesGiven", fields: [senderId], references: [id], onDelete: Cascade)
+  receiverId String
+  receiver  User     @relation("superLikesReceived", fields: [receiverId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  @@unique([senderId, receiverId])
+  @@index([receiverId])
+}
+
+model Match {
+  id         String   @id @default(cuid())
+  userAId    String
+  userA      User     @relation("matchesA", fields: [userAId], references: [id], onDelete: Cascade)
+  userBId    String
+  userB      User     @relation("matchesB", fields: [userBId], references: [id], onDelete: Cascade)
+  compatibilityScore Float?
+  status     String   @default("ACTIVE")
+  createdAt  DateTime @default(now())
+  @@unique([userAId, userBId])
+  @@index([userBId])
+}
+
+model Follow {
+  id         String   @id @default(cuid())
+  followerId String
+  followingId String
+  createdAt  DateTime @default(now())
+  @@unique([followerId, followingId])
+  @@index([followingId])
+}
+
+// ============================================================
+// CHAT
+// ============================================================
+
+model Conversation {
+  id          String   @id @default(cuid())
+  userAId     String
+  userA       User     @relation("conversationA", fields: [userAId], references: [id], onDelete: Cascade)
+  userBId     String
+  userB       User     @relation("conversationB", fields: [userBId], references: [id], onDelete: Cascade)
+  messages    Message[]
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+  @@unique([userAId, userBId])
+  @@index([updatedAt])
+}
+
+model Message {
+  id             String   @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User     @relation("messagesSent", fields: [senderId], references: [id])
+  receiverId     String
+  receiver       User     @relation("messagesReceived", fields: [receiverId], references: [id])
+  type           String   @default("TEXT") // MessageType
+  content        String
+  mediaUrl       String?
+  replyToId      String?
+  giftId         String?
+  status         String   @default("SENT") // MessageStatus
+  reactions      Json?
+  deliveredAt    DateTime?
+  readAt         DateTime?
+  unsent         Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  @@index([conversationId, createdAt])
+  @@index([senderId])
+  @@index([receiverId, status])
+}
+
+model ReadReceipt {
+  id             String @id @default(cuid())
+  conversationId String
+  userId         String
+  lastReadAt     DateTime @default(now())
+  @@unique([conversationId, userId])
+}
+
+// ============================================================
+// CALLS
+// ============================================================
+
+model Call {
+  id               String   @id @default(cuid())
+  callerId         String
+  caller           User     @relation("callsInitiated", fields: [callerId], references: [id], onDelete: Cascade)
+  receiverId       String
+  receiver         User     @relation("callsReceived", fields: [receiverId], references: [id], onDelete: Cascade)
+  type             String   // CallType
+  status           String   @default("RINGING") // CallStatus
+  startedAt        DateTime?
+  answeredAt       DateTime?
+  endedAt          DateTime?
+  durationSeconds  Int      @default(0)
+  costCoins        Int      @default(0)
+  creatorEarnings  Float    @default(0)
+  quality          String?
+  endBy            String?  // participant who ended the call (history/audit)
+  participants     CallParticipant[]
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  @@index([callerId, createdAt])
+  @@index([receiverId, createdAt])
+  @@index([status])
+}
+
+model CallParticipant {
+  id               String   @id @default(cuid())
+  callId           String
+  call             Call     @relation(fields: [callId], references: [id], onDelete: Cascade)
+  userId           String
+  user             User     @relation(fields: [userId], references: [id])
+  role             String   // CallRole
+  joinedAt         DateTime @default(now())
+  leftAt           DateTime?
+  @@unique([callId, userId])
+}
+
+// ============================================================
+// WALLET & COINS
+// ============================================================
+
+model Wallet {
+  id          String @id @default(cuid())
+  userId      String @unique
+  user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  balance     Int    @default(0)
+  currency    String @default("INR")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model CoinPackage {
+  id          String   @id @default(cuid())
+  name        String
+  coins       Int
+  bonusCoins  Int      @default(0)
+  price       Decimal  @db.Decimal(10, 2)
+  currency    String   @default("INR")
+  isPopular   Boolean  @default(false)
+  status      String   @default("ACTIVE")
+  createdAt   DateTime @default(now())
+  @@index([status])
+}
+
+model WalletTransaction {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount      Int
+  currency    String   @default("INR")
+  type        String   // WalletTransactionType
+  status      String   @default("PENDING")
+  balanceAfter Int
+  metadata    Json?
+  referenceId String?
+  idempotencyKey String?  @unique
+  createdAt   DateTime @default(now())
+  @@index([userId, createdAt])
+  @@index([type])
+  @@index([status])
+}
+
+// ============================================================
+// GIFTS
+// ============================================================
+
+model Gift {
+  id           String   @id @default(cuid())
+  name         String
+  imageUrl     String
+  animationUrl String?
+  priceCoins   Int
+  category     String   @default("general")
+  status       String   @default("ACTIVE")
+  createdById  String?
+  createdAt    DateTime @default(now())
+  transactions GiftTransaction[]
+  @@index([status])
+}
+
+model GiftTransaction {
+  id          String   @id @default(cuid())
+  senderId    String
+  sender      User     @relation("giftsSent", fields: [senderId], references: [id], onDelete: Cascade)
+  receiverId  String
+  receiver    User     @relation("giftsReceived", fields: [receiverId], references: [id], onDelete: Cascade)
+  giftId      String
+  gift        Gift     @relation(fields: [giftId], references: [id])
+  priceCoins  Int
+  message     String?
+  contextType String? // chat | call | profile
+  contextId   String?
+  clientRequestId String? @unique
+  createdAt   DateTime @default(now())
+  @@index([senderId, createdAt])
+  @@index([receiverId, createdAt])
+}
+
+// ============================================================
+// SUBSCRIPTIONS
+// ============================================================
+
+model SubscriptionPlan {
+  id          String   @id @default(cuid())
+  tier        String   // PremiumTier
+  cycle       String   // SubscriptionCycle
+  name        String
+  price       Decimal  @db.Decimal(10, 2)
+  currency    String   @default("INR")
+  features    Json?
+  isActive    Boolean  @default(true)
+  subscriptions Subscription[]
+  createdAt   DateTime @default(now())
+  @@unique([tier, cycle])
+}
+
+model Subscription {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planId        String
+  plan          SubscriptionPlan @relation(fields: [planId], references: [id])
+  status        String   @default("ACTIVE")
+  tier          String
+  cycle         String
+  price         Decimal  @db.Decimal(10, 2)
+  currency      String   @default("INR")
+  provider      String?  // payment provider
+  providerId    String?
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?
+  cancelAtPeriodEnd  Boolean @default(false)
+  autoRenew     Boolean  @default(true)
+  gracePeriodUntil DateTime?
+  cancelledAt   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  @@index([userId])
+  @@index([status])
+  @@index([tier])
+}
+
+// ============================================================
+// CREATOR / LISTENER
+// ============================================================
+
+model CreatorProfile {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status        String   @default("PENDING") // CreatorApplicationStatus
+  bio           String?
+  languages     String[] @default([])
+  specialties   String[] @default([])
+  callRateFrom  Int?
+  callRateTo    Int?
+  rating        Float?
+  ratingCount   Int      @default(0)
+  totalEarnings Float    @default(0)
+  totalMinutes  Int      @default(0)
+  kyciStatus    String   @default("NOT_SUBMITTED") // KycStatus
+  kycDetails    Json?
+  approvedAt    DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  applications  CreatorApplication[]
+  earnings      CreatorEarning[]
+}
+
+model CreatorApplication {
+  id          String   @id @default(cuid())
+  creatorProfileId String
+  creatorProfile CreatorProfile @relation(fields: [creatorProfileId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status      String   @default("PENDING")
+  reason      String?
+  experience  String?
+  verificationType String?
+  reviewedBy  String?
+  reviewNote  String?
+  reviewedAt  DateTime?
+  createdAt   DateTime @default(now())
+  @@index([status])
+  @@index([userId])
+}
+
+model CreatorEarning {
+  id          String   @id @default(cuid())
+  creatorId   String
+  creatorProfile CreatorProfile @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        String   // AUDIO_CALL | VIDEO_CALL | GIFT | BONUS | REFERRAL
+  amount      Float
+  coins       Int      @default(0)
+  status      String   @default("PENDING") // pending balance | AVAILABLE | WITHDRAWN | UNCOLLECTIBLE
+  withdrawnAmount Float @default(0) // portion already claimed by (possibly rejected) withdrawals
+  callId      String?
+  referenceId String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  @@index([creatorId, createdAt])
+  @@index([status])
+}
+
+// ============================================================
+// WITHDRAWALS
+// ============================================================
+
+model Withdrawal {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount        Float
+  currency      String   @default("INR")
+  method        String   // WithdrawalMethod
+  details       Json?
+  status        String   @default("PENDING")
+  referenceId   String?
+  rejectionReason String?
+  processedBy   String?
+  processedAt   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  @@index([userId, createdAt])
+  @@index([status])
+}
+
+// ============================================================
+// REFERRALS
+// ============================================================
+
+model Referral {
+  id          String   @id @default(cuid())
+  referrerId  String
+  referrer    User     @relation("referralsMade", fields: [referrerId], references: [id], onDelete: Cascade)
+  referredUserId String @unique
+  referredUser  User   @relation("referredBy", fields: [referredUserId], references: [id], onDelete: Cascade)
+  status      String   @default("PENDING")
+  rewardCoins Int      @default(0)
+  createdAt   DateTime @default(now())
+  @@index([referrerId])
+}
+
+// ============================================================
+// NOTIFICATIONS
+// ============================================================
+
+model Notification {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        String   // NotificationType
+  title       String
+  body        String
+  data        Json?
+  isRead      Boolean  @default(false)
+  readAt      DateTime?
+  createdAt   DateTime @default(now())
+  @@index([userId, createdAt])
+  @@index([isRead])
+}
+
+// ============================================================
+// REPORTS & MODERATION
+// ============================================================
+
+model Report {
+  id            String   @id @default(cuid())
+  reporterId    String
+  reporter      User     @relation("reportsFiled", fields: [reporterId], references: [id], onDelete: Cascade)
+  reportedUserId String
+  reportedUser  User     @relation("reportsReceived", fields: [reportedUserId], references: [id], onDelete: Cascade)
+  targetType    String   @default("USER")
+  targetId      String?
+  category      String
+  description   String?
+  status        String   @default("PENDING")
+  resolution    String?
+  resolvedBy    String?
+  resolvedAt    DateTime?
+  attachments   Json?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  @@index([status])
+  @@index([reportedUserId])
+  @@index([reporterId])
+}
+
+model Block {
+  id         String   @id @default(cuid())
+  blockerId  String
+  blocker    User     @relation("blocksMade", fields: [blockerId], references: [id], onDelete: Cascade)
+  blockedId  String
+  blocked    User     @relation("blocksReceived", fields: [blockedId], references: [id], onDelete: Cascade)
+  reason     String?
+  createdAt  DateTime @default(now())
+  @@unique([blockerId, blockedId])
+  @@index([blockedId])
+}
+
+model ModerationAction {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  actionType  String
+  severity    String   @default("MEDIUM")
+  reason      String?
+  adminId     String?
+  days        Int?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  @@index([userId])
+  @@index([actionType])
+}
+
+// ============================================================
+// BOOSTS & REWARDS
+// ============================================================
+
+model Boost {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        String   // BoostType
+  status      String   @default("ACTIVE")
+  costCoins   Int
+  startedAt   DateTime @default(now())
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  @@index([userId])
+  @@index([status, expiresAt])
+}
+
+model Reward {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        String   // DAILY | STREAK | PROMOTION
+  coins       Int
+  status      String   @default("UNCLAIMED")
+  day         Int?
+  expiresAt   DateTime?
+  claimableAt DateTime?
+  claimedAt   DateTime?
+  createdAt   DateTime @default(now())
+  @@unique([userId, day])
+  @@index([userId, type, status])
+}
+
+// ============================================================
+// PAYMENTS
+// ============================================================
+
+model Payment {
+  id          String   @id @default(cuid())
+  userId      String
+  orderId     String   @unique
+  provider    String
+  providerOrderId String?
+  providerPaymentId String?
+  amount      Decimal  @db.Decimal(10, 2)
+  currency    String   @default("INR")
+  status      String   @default("CREATED")
+  purpose     String   // COINS | SUBSCRIPTION
+  relatedId   String?
+  metadata    Json?
+  webhookReceived Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  @@index([userId])
+  @@index([status])
+  @@index([purpose])
+}
+
+// ============================================================
+// ADMIN
+// ============================================================
+
+model Admin {
+  id          String   @id @default(cuid())
+  userId      String?  @unique
+  email       String   @unique
+  passwordHash String
+  name        String
+  role        String   @default("MODERATOR") // AdminRole
+  isActive    Boolean  @default(true)
+  lastLoginAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model AdminRoleModel {
+  id          String @id @default(cuid())
+  name        String @unique
+  permissions String[] @default([])
+  description String?
+  createdAt   DateTime @default(now())
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  actorId     String?
+  actorType   String   @default("USER") // USER | ADMIN
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id])
+  action      String
+  entityType  String?
+  entityId    String?
+  metadata    Json?
+  ipAddress   String?
+  createdAt   DateTime @default(now())
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+// ============================================================
+// ANTI-ABUSE / SAFETY SIGNALS
+// ============================================================
+
+model SafetySignal {
+  id          String   @id @default(cuid())
+  userId      String
+  signalType  String   // SPAM | SCAM | TOXICITY | FAKE | ABUSE
+  score       Float
+  reason      String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  @@index([userId])
+  @@index([signalType])
+}
+
+// ============================================================
+// USER RISK (INTERNAL — NEVER EXPOSED PUBLICLY)
+// ============================================================
+
+model UserRisk {
+  userId         String   @id @unique
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  level          String   @default("LOW") // RiskLevel
+  totalScore     Float    @default(0)
+  signalCount    Int      @default(0)
+  lastComputedAt DateTime @default(now())
+  breakdown      Json?    // per-signal contributions (internal)
+  flaggedAt      DateTime?
+  @@index([level])
+}
+
+// ============================================================
+// MODERATION CASE
+// ============================================================
+
+model ModerationCase {
+  id                  String   @id @default(cuid())
+  userId              String
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  primaryCategory     String?  // ReportCategory
+  riskLevel           String   @default("LOW") // RiskLevel
+  priority            String   @default("NORMAL") // ModerationCasePriority
+  status              String   @default("OPEN") // ModerationCaseStatus
+  summary             String?
+  evidenceRefs        String[] @default([])
+  aiSignals           Json?    // {provider, model, version, timestamp, categories[], confidence}
+  assignedTo          String?  // admin id
+  createdByReportId   String?
+  createdBy           String?  // 'REPORT' | 'AI_FLAG' | 'AUTO'
+  decidedAt           DateTime?
+  decidedBy           String?
+  decision            String?
+  decisionNote        String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  appeals             Appeal[]
+  @@index([status])
+  @@index([priority])
+}
+
+// ============================================================
+// APPEALS
+// ============================================================
+
+model Appeal {
+  id               String   @id @default(cuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  caseId           String?
+  case             ModerationCase? @relation(fields: [caseId], references: [id], onDelete: SetNull)
+  restrictionType  String
+  violationCount   Int      @default(1)
+  reason           String
+  message          String?
+  status           String   @default("SUBMITTED") // AppealStatus
+  reviewedBy       String?
+  reviewNote       String?
+  decidedAt        DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  @@index([status])
+  @@index([userId])
+}
+
+// ============================================================
+// ACTIVE USER RESTRICTION
+// ============================================================
+
+model UserRestriction {
+  id               String   @id @default(cuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type             String   // RestrictionType
+  scope            String   @default("ALL") // RestrictionScope
+  reason           String?
+  moderationCaseId String?
+  startsAt         DateTime @default(now())
+  expiresAt        DateTime?
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  @@index([userId])
+  @@index([isActive])
+  @@index([type])
+}
+
+// ============================================================
+// SECURITY EVENTS
+// ============================================================
+
+model SecurityEvent {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type       String   // SecurityEventType
+  ipAddress  String?
+  deviceName String?
+  deviceId   String?
+  metadata   Json?
+  isRead     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  @@index([userId])
+  @@index([type])
+}
+
+// ============================================================
+// VERIFICATION REQUESTS (server-controlled badges)
+// ============================================================
+
+model Verification {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badge      String   // VerificationBadge (USER | CREATOR) — target badge
+  method     String   // MANUAL | KYC | ID_DOC
+  status     String   @default("PENDING") // VerificationStatus
+  evidence   Json?
+  approvedBy String?
+  approvedAt DateTime?
+  rejectedBy String?
+  rejectedAt DateTime?
+  rejectReason String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  @@index([userId])
+  @@index([status])
+  @@index([badge])
+}
+
+// ============================================================
+// FRAUD FLAGS (payment / referral / withdrawal / earning / gift)
+// ============================================================
+
+model FraudFlag {
+  id         String   @id @default(cuid())
+  entityType String   // FraudEntityType
+  entityId   String
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  riskLevel  String   @default("MEDIUM")
+  reason     String
+  evidence   Json?
+  source     String   @default("RULE") // FraudFlagSource
+  status     String   @default("OPEN") // FraudFlagStatus
+  resolvedBy String?
+  resolvedAt DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  @@index([status])
+  @@index([entityType, entityId])
+  @@index([userId])
+}
+
+// ============================================================
+// CONTENT FLAGS (AI-assisted image/text/voice review queue)
+// ============================================================
+
+model ContentFlag {
+  id           String   @id @default(cuid())
+  contentType  String   // ContentFlagType
+  contentId    String?
+  ownerUserId  String
+  user         User     @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  category     String
+  confidence   Float
+  status       String   @default("REVIEW") // ContentFlagStatus
+  provider     String
+  modelId      String?
+  isBlocking   Boolean  @default(false)
+  reviewedBy   String?
+  reviewedAt   DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  @@index([status])
+  @@index([ownerUserId])
+}
+
+// ============================================================
+// AI MODERATION AUDIT TRAIL
+// ============================================================
+
+model ModerationAudit {
+  id         String   @id @default(cuid())
+  modelId    String   // provider/model identifier
+  version    String?
+  category   String
+  confidence Float
+  result     String   // FLAG | CLEAR | REVIEW
+  decision   String?  // human decision
+  userId     String?
+  contextId  String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+  @@index([createdAt])
+}
+
+// ============================================================
+// ACCOUNT DELETION JOB
+// ============================================================
+
+model AccountDeletion {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status         String   @default("PENDING") // AccountDeletionStatus
+  reason         String?
+  requestedAt    DateTime @default(now())
+  processedAt    DateTime?
+  anonymizedAt   DateTime?
+  retentionUntil DateTime?
+  metadata       Json?
+  @@index([status])
+}

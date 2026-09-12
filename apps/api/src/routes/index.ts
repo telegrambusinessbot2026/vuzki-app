@@ -1,0 +1,36 @@
+import { Router } from 'express';
+import { authRoutes } from './auth';
+import { userRoutes } from './users';
+import { discoveryRoutes } from './discovery';
+import { chatRoutes } from './chat';
+import { callRoutes } from './calls';
+import { walletRoutes } from './wallet';
+import { subscriptionRoutes } from './subscriptions';
+import { giftRoutes } from './gifts';
+import { creatorRoutes } from './creators';
+import { withdrawalRoutes } from './withdrawals';
+import { referralRoutes } from './referrals';
+import { reportRoutes } from './reports';
+import { notificationRoutes } from './notifications';
+import { searchRoutes } from './search';
+import { miscRoutes } from './misc';
+import { adminRoutes } from './admin';
+
+export const routes = Router();
+
+routes.use('/auth', authRoutes);
+routes.use('/users', userRoutes);
+routes.use('/discovery', discoveryRoutes);
+routes.use('/chat', chatRoutes);
+routes.use('/calls', callRoutes);
+routes.use('/wallet', walletRoutes);
+routes.use('/subscriptions', subscriptionRoutes);
+routes.use('/gifts', giftRoutes);
+routes.use('/creators', creatorRoutes);
+routes.use('/withdrawals', withdrawalRoutes);
+routes.use('/referrals', referralRoutes);
+routes.use('/reports', reportRoutes);
+routes.use('/notifications', notificationRoutes);
+routes.use('/search', searchRoutes);
+routes.use('/admin', adminRoutes);
+routes.use('/', miscRoutes);

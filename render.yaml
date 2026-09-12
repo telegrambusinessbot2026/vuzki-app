@@ -1,0 +1,100 @@
+# =====================================================================
+# VUZKI - Render Blueprint
+#
+# ONE frontend Web Service that serves BOTH:
+#   1. the public VUZKI website  (https://vuzki.app/, /features, ...)
+#   2. the VUZKI web application (/auth/*, /app/*)
+#
+# The Next.js app at apps/web contains every route on the same service:
+#   /               -> website landing page
+#   /features       -> website page
+#   /auth/login     -> login
+#   /auth/register  -> registration
+#   /app/home       -> application
+#   /app/discover   -> application
+#   etc.
+#
+# There is intentionally NO second frontend service for the app. The API
+# (apps/api - Express + Socket.IO) is a separate backend service and is NOT
+# defined here; see the commented API service below for the deploy recipe.
+# =====================================================================
+
+services:
+  - type: web
+    name: vuzki-web
+    runtime: node
+    plan: starter
+    # CRITICAL: Render injects service env vars (incl. NODE_ENV=production below)
+    # into the build environment. A bare `npm install` under NODE_ENV=production
+    # omits dev dependencies (turbo, typescript, tailwindcss), which are required
+    # to build the Next.js app and the @vuzki workspace packages. `--include=dev`
+    # forces them to be installed for the build.
+    #
+    # `npm run build:web` = `turbo run build --filter=@vuzki/web`. Turbo also runs
+    # `build` for the workspace dependencies first (@vuzki/shared, @vuzki/utils,
+    # @vuzki/types -> tsc -> dist), so imports resolve to compiled dist files.
+    buildCommand: npm install --include=dev && npm run build:web
+    # `npm run start:web` -> `next start`, which automatically listens on
+    # Render's PORT env var (NOT hard-coded to 3000). NOTE: the console line
+    # '"next start" does not work with "output: standalone"' is a non-fatal
+    # warning; next start serves fine here and is the production-safe path for
+    # this npm-workspace monorepo (the standalone trace omits @vuzki packages).
+    startCommand: npm run start:web
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: "20.11.0"
+      - key: NODE_ENV
+        value: production
+      # ---- Public / browser-safe (NEXT_PUBLIC_* are inlined at build time) ----
+      - key: NEXT_PUBLIC_API_URL
+        value: https://api.vuzki.app/api/v1
+      - key: NEXT_PUBLIC_SOCKET_URL
+        value: https://api.vuzki.app
+      - key: NEXT_PUBLIC_APP_NAME
+        value: VUZKI
+      - key: NEXT_PUBLIC_SITE_URL
+        value: https://vuzki.app
+
+  # ------------------------------------------------------------------
+  # VUZKI API (apps/api) - separate backend service.
+  # https://api.vuzki.app  (Express REST + Socket.IO realtime)
+  #
+  # Uncomment and fill secret env vars from the Render dashboard /
+  # secret manager when you are ready to deploy the backend:
+  #
+  # - type: web
+  #   name: vuzki-api
+  #   runtime: node
+  #   plan: starter
+  #   buildCommand: npm install --include=dev && npm run build:api
+  #   startCommand: npm run start:api
+  #   healthCheckPath: /health
+  #   envVars:
+  #     - key: NODE_VERSION
+  #       value: "20.11.0"
+  #     - key: NODE_ENV
+  #       value: production
+  #     - key: API_PORT
+  #       value: "4000"
+  #     - key: API_HOST
+  #       value: 0.0.0.0
+  #     - key: API_PUBLIC_URL
+  #       value: https://api.vuzki.app
+  #     # Frontend domain(s) that call the API. The single frontend runs on
+  #     # https://vuzki.app, so vuzki.app MUST be in this list.
+  #     - key: CORS_ORIGINS
+  #       value: https://vuzki.app,https://admin.vuzki.app
+  #     - key: WEB_URL
+  #       value: https://vuzki.app
+  #     - key: WEBSITE_URL
+  #       value: https://vuzki.app
+  #     - key: DATABASE_URL
+  #       sync: false            # set in Render dashboard / secret manager
+  #     - key: JWT_SECRET
+  #       sync: false
+  #     - key: JWT_REFRESH_SECRET
+  #       sync: false
+  #     - key: REDIS_URL
+  #       sync: false
+# =====================================================================

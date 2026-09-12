@@ -1,0 +1,131 @@
+name: Deploy Production
+
+# VUZKI - Production deployment.
+#
+# Requires manual trigger. Protected by GitHub Environment approvals (see the
+# `production` environment's required reviewers) so a human must approve before
+# the deploy proceeds. Deploys safely, verifies migrations, runs health checks,
+# and verifies critical services before marking success.
+#
+# Rollback: if this workflow succeeds but a later incident is detected, roll
+# back by re-running the preceding known-good image tag (or `git revert` +
+# re-deploy). See docs/DEPLOYMENT.md - Rollback.
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Docker image tag to deploy (default: latest)"
+        required: false
+        default: latest
+
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+env:
+  IMAGE_REGISTRY: ${{ secrets.REGISTRY_URL }}
+  PROD_HOST: ${{ secrets.PROD_HOST }}
+  PROD_USER: ${{ secrets.PROD_USER }}
+  PROD_KEY: ${{ secrets.PROD_SSH_KEY }}
+  IMAGE_TAG: ${{ github.event.inputs.image_tag || 'latest' }}
+
+jobs:
+  deployment:
+    name: Production Deploy
+    runs-on: ubuntu-latest
+    environment: production   # <-- requires approval (env protection rules)
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.IMAGE_REGISTRY }}
+          username: ${{ secrets.REGISTRY_USER }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Build and push images
+        uses: docker/bake-action@v5
+        with:
+          files: infrastructure/docker/docker-compose.yml
+          targets: api worker web admin
+          push: true
+        env:
+          DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+          REDIS_URL: ${{ secrets.PROD_REDIS_URL }}
+          JWT_SECRET: ${{ secrets.PROD_JWT_SECRET }}
+          JWT_REFRESH_SECRET: ${{ secrets.PROD_JWT_REFRESH_SECRET }}
+          SESSION_SECRET: ${{ secrets.PROD_SESSION_SECRET }}
+
+      - name: Verify database compatibility (migrate status)
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ env.PROD_HOST }}
+          username: ${{ env.PROD_USER }}
+          key: ${{ env.PROD_KEY }}
+          script: |
+            set -e
+            cd /srv/vuzki/production
+            docker pull ${{ env.IMAGE_REGISTRY }}/vuzki-api:${{ env.IMAGE_TAG }}
+            docker run --rm --env-file .env.production \
+              ${{ env.IMAGE_REGISTRY }}/vuzki-api:${{ env.IMAGE_TAG }} \
+              node -e "const {execSync}=require('child_process'); try { execSync('npx --prefix /app/packages/database prisma migrate diff --from-migrations prisma/migrations --to-schema-datamodel prisma/schema.prisma --exit-code',{stdio:'inherit'}); console.log('MIGRATIONS_VALID'); } catch(e){ if(!e.status){throw e} console.log('MIGRATIONS_DRIFT_DETECTED'); process.exit(1); }"
+
+      - name: Run migrations (staging-tested)
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ env.PROD_HOST }}
+          username: ${{ env.PROD_USER }}
+          key: ${{ env.PROD_KEY }}
+          script: |
+            set -e
+            cd /srv/vuzki/production
+            docker run --rm --env-file .env.production \
+              ${{ env.IMAGE_REGISTRY }}/vuzki-api:${{ env.IMAGE_TAG }} \
+              npx --prefix /app/packages/database prisma migrate deploy --schema /app/packages/database/prisma/schema.prisma
+
+      - name: Deploy services
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ env.PROD_HOST }}
+          username: ${{ env.PROD_USER }}
+          key: ${{ env.PROD_KEY }}
+          script: |
+            set -e
+            cd /srv/vuzki/production
+            TAG=${{ env.IMAGE_TAG }} docker compose -f infrastructure/docker/docker-compose.yml --env-file .env.production up -d api worker web admin
+            docker compose -f infrastructure/docker/docker-compose.yml --env-file .env.production ps
+
+      - name: Post-deploy health checks
+        run: |
+          set -e
+          sleep 20
+          curl --fail --silent --show-error https://api.vuzki.app/health  | grep '"status":"ok"'
+          curl --fail --silent --show-error https://api.vuzki.app/ready   | grep '"status":"ok"'
+
+      - name: Verify critical services
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ env.PROD_HOST }}
+          username: ${{ env.PROD_USER }}
+          key: ${{ env.PROD_KEY }}
+          script: |
+            set -e
+            cd /srv/vuzki/production
+            # API liveness, worker process, DB connectivity, Redis connectivity
+            curl --fail -s http://127.0.0.1:4000/health || exit 1
+            docker compose -f infrastructure/docker/docker-compose.yml --env-file .env.production ps --filter status=running | grep -E 'vuzki-(api|worker|web|admin)' || exit 1
+            docker exec vuzki-api node -e "const {PrismaClient}=require('@prisma/client'); new PrismaClient().$queryRaw\`SELECT 1\`.then(()=>{console.log('DB_OK');process.exit(0)},()=>process.exit(1))"
+
+      - name: Notify success
+        run: echo "Production deploy complete - v${{ env.IMAGE_TAG }}"

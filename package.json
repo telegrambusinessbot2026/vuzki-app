@@ -1,0 +1,43 @@
+{
+  "name": "vuzki",
+  "version": "1.0.0",
+  "private": true,
+  "description": "VUZKI - Meet • Talk • Connect - Social & Stranger Connect Platform",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "dev:web": "turbo run dev --filter=@vuzki/web",
+    "dev:admin": "turbo run dev --filter=@vuzki/admin",
+    "dev:api": "turbo run dev --filter=@vuzki/api",
+    "dev:website": "turbo run dev --filter=@vuzki/website",
+    "build": "turbo run build",
+    "build:web": "turbo run build --filter=@vuzki/web",
+    "build:api": "turbo run build --filter=@vuzki/api",
+    "build:admin": "turbo run build --filter=@vuzki/admin",
+    "build:website": "turbo run build --filter=@vuzki/website",
+    "start:web": "npm run start --workspace @vuzki/web",
+    "start:api": "npm run start --workspace @vuzki/api",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "test:api": "turbo run test --filter=@vuzki/api",
+    "typecheck": "turbo run typecheck",
+    "db:generate": "npm run generate --workspace @vuzki/database",
+    "db:push": "npm run push --workspace @vuzki/database",
+    "db:migrate": "npm run migrate --workspace @vuzki/database",
+    "db:seed": "npm run seed --workspace @vuzki/database",
+    "db:studio": "npm run studio --workspace @vuzki/database",
+    "format": "prettier --write \"**/*.{ts,tsx,js,json,md}\""
+  },
+  "devDependencies": {
+    "prettier": "^3.2.5",
+    "turbo": "^2.0.6",
+    "typescript": "^5.4.5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "packageManager": "npm@10.8.2"
+}

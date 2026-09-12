@@ -1,0 +1,546 @@
+'use client';
+
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import Link from 'next/link';
+import { useParams, useSearchParams } from 'next/navigation';
+import { api, post, API_URL } from '@/lib/api';
+import { useRealtime } from '@/lib/realtime-context';
+import { Avatar } from '@/components/ui/Avatar';
+import { Button } from '@/components/ui/Button';
+import { CloseIcon, MicIcon, MicOffIcon, VideoIcon, CameraOffIcon, GiftIcon, SpeakerIcon, CoinIcon, FlagIcon } from '@/components/ui/Icons';
+
+const API_ORIGIN = API_URL.replace(/\/api\/v1\/?$/, '');
+const STUN = 'stun:stun.l.google.com:19302';
+
+type CallType = 'AUDIO' | 'VIDEO';
+type CallState =
+  | 'connecting'
+  | 'connected'
+  | 'ended'
+  | 'missed'
+  | 'busy'
+  | 'rejected'
+  | 'cancelled'
+  | 'rate_limited'
+  | 'offline'
+  | 'gift';
+
+interface CallGift {
+  id: string;
+  name: string;
+  imageUrl: string | null;
+  animationUrl: string | null;
+  priceCoins: number;
+}
+
+const fmt = (s: number) => {
+  const m = Math.floor(s / 60).toString().padStart(2, '0');
+  const sec = (s % 60).toString().padStart(2, '0');
+  return `${m}:${sec}`;
+};
+
+export default function CallScreen() {
+  const params = useParams();
+  const search = useSearchParams();
+  const id = String(params.id);
+  const qType = (search.get('type') as 'audio' | 'video') || 'audio';
+  const type: CallType = qType === 'video' ? 'VIDEO' : 'AUDIO';
+  const ongoing = search.get('ongoing');
+  const incoming = search.get('incoming');
+  const presetsName = search.get('name');
+
+  const { socket, connected, joinRoom, leaveRoom, emit, on } = useRealtime();
+
+  const [displayName, setDisplayName] = useState(presetsName ? decodeURIComponent(presetsName) : id);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [callState, setCallState] = useState<CallState>(ongoing || incoming ? 'connecting' : 'connecting');
+  const [seconds, setSeconds] = useState(0);
+  const [micOn, setMicOn] = useState(true);
+  const [camOn, setCamOn] = useState(true);
+  const [speakerOn, setSpeakerOn] = useState(true);
+  const [showGifts, setShowGifts] = useState(false);
+  const [gifts, setGifts] = useState<CallGift[]>([]);
+  const [giftsToast, setGiftsToast] = useState<string | null>(null);
+
+  const pcRef = useRef<RTCPeerConnection | null>(null);
+  const localStreamRef = useRef<MediaStream | null>(null);
+  const callIdRef = useRef<string | null>(ongoing || incoming || null);
+  const otherIdRef = useRef(id);
+  otherIdRef.current = id;
+  const localVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const timerStarted = useRef(false);
+  const facingRef = useRef('user');
+  const initializedRef = useRef(false);
+
+  const setStatus = useCallback((st: CallState) => {
+    setCallState(st);
+    if (st === 'connected') {
+      timerStarted.current = true;
+    } else if (st === 'ended' || st === 'missed' || st === 'rejected' || st === 'cancelled' || st === 'busy') {
+      timerStarted.current = false;
+    }
+  }, []);
+
+  const isEndState = ['ended', 'missed', 'rejected', 'cancelled', 'busy', 'rate_limited', 'offline'].includes(callState);
+
+  // load gifts for in-call gifting
+  useEffect(() => {
+    api<{ items: CallGift[] }>('/gifts', { auth: true })
+      .then((d) => setGifts(d.items ?? []))
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const setupPeer = useCallback((callId: string) => {
+    const pc = new RTCPeerConnection({ iceServers: [{ urls: STUN }] });
+    pcRef.current = pc;
+
+    const local = localStreamRef.current;
+    if (local) {
+      local.getTracks().forEach((t) => pc.addTrack(t, local));
+    }
+    pc.ontrack = (ev) => {
+      if (ev.streams && ev.streams[0]) {
+        if (remoteVideoRef.current) remoteVideoRef.current.srcObject = ev.streams[0];
+      }
+    };
+    pc.onicecandidate = (ev) => {
+      if (ev.candidate && callIdRef.current) {
+        emit('call:signal', { callId, to: otherIdRef.current, event: 'candidate', data: ev.candidate });
+      }
+    };
+    pc.onconnectionstatechange = () => {
+      if (pc.connectionState === 'connected') {
+        emit('call:connection', { callId, status: 'CONNECTED' });
+      } else if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
+        emit('call:connection', { callId, status: 'DISCONNECTED' });
+      }
+    };
+    return pc;
+  }, [emit]);
+
+  const initVideo = useCallback(async (callId: string, forOffer: boolean) => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: type === 'VIDEO',
+      });
+      localStreamRef.current = stream;
+      if (localVideoRef.current) localVideoRef.current.srcObject = stream;
+      const pc = setupPeer(callId);
+      if (forOffer) {
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        emit('call:signal', { callId, to: otherIdRef.current, event: 'offer', data: { sdp: pc.localDescription } });
+      }
+    } catch {
+      /* permission denied - proceed without local media */
+      const pc = setupPeer(callId);
+      if (forOffer) {
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        emit('call:signal', { callId, to: otherIdRef.current, event: 'offer', data: { sdp: pc.localDescription } });
+      }
+    }
+  }, [type, setupPeer, emit]);
+
+  // Main init
+  useEffect(() => {
+    if (initializedRef.current) return;
+    initializedRef.current = true;
+
+    if (ongoing || incoming) {
+      // Receiver side: we already joined via accept overlay; join the call room
+      const callId = (ongoing || incoming) as string;
+      callIdRef.current = callId;
+      joinRoom(`call:${callId}`);
+      if (incoming && socket) emit('call:accept', { callId });
+      initVideo(callId, false);
+    } else {
+      // Caller: initiate
+      emit(
+        'call:initiate',
+        { receiverId: id, type },
+        (res: any) => {
+          if (res?.ok && res.data) {
+            const callId: string = res.data.callId;
+            callIdRef.current = callId;
+            joinRoom(`call:${callId}`);
+            initVideo(callId, true);
+          } else {
+            const err = res?.error || 'RATE_LIMITED';
+            if (err === 'USER_OFFLINE') setStatus('offline');
+            else if (err === 'RATE_LIMITED') setStatus('rate_limited');
+            else setStatus('busy');
+          }
+        }
+      );
+    }
+
+    return () => {
+      if (pcRef.current) pcRef.current.close();
+      localStreamRef.current?.getTracks().forEach((t) => t.stop());
+      const callId = callIdRef.current;
+      if (callId) leaveRoom(`call:${callId}`);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // realtime listeners
+  useEffect(() => {
+    if (!on) return;
+    const offs: (() => void)[] = [];
+
+    offs.push(
+      on('call:signal', async (p: { from: string; callId: string; event: string; data: any }) => {
+        if (p.callId !== callIdRef.current) return;
+        const pc = pcRef.current;
+        if (!pc) return;
+        if (p.event === 'offer') {
+          await pc.setRemoteDescription(new RTCSessionDescription(p.data.sdp));
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          emit('call:signal', { callId: p.callId, to: otherIdRef.current, event: 'answer', data: { sdp: pc.localDescription } });
+        } else if (p.event === 'answer') {
+          await pc.setRemoteDescription(new RTCSessionDescription(p.data.sdp));
+        } else if (p.event === 'candidate') {
+          try {
+            await pc.addIceCandidate(p.data.candidate);
+          } catch {
+            /* ignore */
+          }
+        }
+      })
+    );
+
+    offs.push(on('call:accepted', () => {}));
+    offs.push(
+      on('call:rejected', () => {
+        setStatus('rejected');
+      })
+    );
+    offs.push(
+      on('call:cancelled', () => {
+        setStatus('cancelled');
+      })
+    );
+    offs.push(
+      on('call:missed', () => {
+        setStatus('missed');
+      })
+    );
+    offs.push(
+      on('call:busy', () => {
+        setStatus('busy');
+      })
+    );
+    offs.push(
+      on('call:ended', () => {
+        setStatus('ended');
+      })
+    );
+    offs.push(
+      on('call:state', (p: { callId: string; status: string }) => {
+        if (p.callId !== callIdRef.current) return;
+        if (p.status === 'CONNECTED') setStatus('connected');
+        else if (p.status === 'ENDED') setStatus('ended');
+        else if (p.status === 'REJECTED') setStatus('rejected');
+        else if (p.status === 'CANCELLED') setStatus('cancelled');
+        else if (p.status === 'MISSED') setStatus('missed');
+        else if (p.status === 'BUSY') setStatus('busy');
+        else if (p.status === 'FAILED') setStatus('ended');
+      })
+    );
+    offs.push(
+      on('call:gift', (p: { callId: string; from: string; gift: { name: string } }) => {
+        if (p.from !== otherIdRef.current) return;
+        setGiftsToast(`${p.gift.name} received! 🎁`);
+        setTimeout(() => setGiftsToast(null), 3000);
+      })
+    );
+
+    return () => offs.forEach((f) => f());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [on, emit, callIdRef.current]);
+
+  // timer while connected/idle (show elapsed during call)
+  useEffect(() => {
+    if (!timerStarted.current) return;
+    const interval = setInterval(() => setSeconds((s) => s + 1), 1000);
+    return () => clearInterval(interval);
+  }, [callState]);
+
+  // fetch the other user's public profile for the UI
+  useEffect(() => {
+    if (presetsName && !ongoing && !incoming) return;
+    if (ongoing || incoming) {
+      api<{ user?: { displayName?: string; avatarUrl?: string | null } }>(`/users/${id}`, { auth: true })
+        .then((d) => {
+          if (d?.user?.displayName) setDisplayName(d.user.displayName);
+          if (d?.user?.avatarUrl) setAvatarUrl(d.user.avatarUrl);
+        })
+        .catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
+  const toggleMic = () => {
+    const next = !micOn;
+    setMicOn(next);
+    localStreamRef.current?.getAudioTracks().forEach((t) => (t.enabled = next));
+  };
+
+  const toggleCam = () => {
+    const next = !camOn;
+    setCamOn(next);
+    if (type === 'VIDEO') localStreamRef.current?.getVideoTracks().forEach((t) => (t.enabled = next));
+  };
+
+  const swapCamera = async () => {
+    if (type !== 'VIDEO') return;
+    facingRef.current = facingRef.current === 'user' ? 'environment' : 'user';
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: { facingMode: { ideal: facingRef.current } },
+      });
+      localStreamRef.current?.getTracks().forEach((t) => t.stop());
+      localStreamRef.current = stream;
+      if (localVideoRef.current) localVideoRef.current.srcObject = stream;
+      if (pcRef.current) {
+        const sender = pcRef.current.getSenders().find((s) => s.track?.kind === 'video');
+        const videoTrack = stream.getVideoTracks()[0];
+        if (sender && videoTrack) sender.replaceTrack(videoTrack);
+      }
+      setCamOn(true);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const endCall = () => {
+    const callId = callIdRef.current;
+    if (callId) emit('call:end', { callId, quality: 4 });
+    pcRef.current?.close();
+    localStreamRef.current?.getTracks().forEach((t) => t.stop());
+    if (callId) leaveRoom(`call:${callId}`);
+    setStatus('ended');
+  };
+
+  const report = () => {
+    const callId = callIdRef.current;
+    if (callId) emit('call:report', { callId, category: 'OTHER', description: 'Reported during call' });
+    setStatus('ended');
+  };
+
+  const block = () => {
+    const callId = callIdRef.current;
+    if (callId) emit('call:block', { callId });
+    pcRef.current?.close();
+    localStreamRef.current?.getTracks().forEach((t) => t.stop());
+    setStatus('ended');
+  };
+
+  const sendGift = (g: CallGift) => {
+    const callId = callIdRef.current;
+    if (!callId) return;
+    emit('call:gift', { callId, to: otherIdRef.current, giftId: g.id });
+    setShowGifts(false);
+  };
+
+  const statusLabel: Record<CallState, string> = {
+    connecting: 'Connecting…',
+    connected: fmt(seconds),
+    ended: 'Call ended',
+    missed: 'Missed call',
+    busy: 'Busy',
+    rejected: 'Call declined',
+    cancelled: 'Call cancelled',
+    rate_limited: 'Rate limited — try again in a moment',
+    offline: 'User is offline',
+    gift: '',
+  };
+
+  const callActive = callState === 'connecting' || callState === 'connected';
+
+  return (
+    <div className="fixed inset-0 z-50 bg-surface flex flex-col">
+      {/* Remote / background */}
+      <div className="flex-1 relative">
+        {type === 'VIDEO' && callActive ? (
+          <div className="absolute inset-0 bg-black/80">
+            <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
+            <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-black/60" />
+          </div>
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="text-center">
+              <Avatar src={avatarUrl} name={displayName} size="2xl" online />
+              <h1 className="text-2xl font-bold mt-4">{displayName}</h1>
+              <p className="text-white/50 mt-1 text-sm">{statusLabel[callState]}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Video top overlay */}
+        {type === 'VIDEO' && callActive && (
+          <div className="absolute top-0 inset-x-0 p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Avatar src={avatarUrl} name={displayName} size="sm" online />
+              <div>
+                <p className="font-semibold">{displayName}</p>
+                <p className="text-xs text-white/70">{callState === 'connected' ? fmt(seconds) : 'Connecting…'}</p>
+              </div>
+            </div>
+            <button onClick={swapCamera} className="p-2 rounded-full bg-white/10 backdrop-blur border border-white/20 text-white" aria-label="Swap camera">
+              <VideoIcon size={18} />
+            </button>
+          </div>
+        )}
+
+        {/* Self video mini */}
+        {type === 'VIDEO' && camOn && callActive && (
+          <div className="absolute bottom-24 right-4 h-40 w-28 rounded-2xl overflow-hidden border-2 border-white/30 shadow-2xl bg-black">
+            <video ref={localVideoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+            <div className="absolute bottom-1 right-1 text-[9px] text-white/70 bg-black/40 rounded px-1">You</div>
+          </div>
+        )}
+
+        {/* Gifts toast */}
+        {giftsToast && (
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full bg-brand-600 text-white text-sm font-medium shadow-lg">
+            {giftsToast}
+          </div>
+        )}
+      </div>
+
+      {/* In-call gift picker */}
+      {showGifts && !isEndState && (
+        <div className="absolute inset-x-0 bottom-0 z-20 bg-surface-raised border-t border-surface-border p-3 rounded-t-3xl">
+          <div className="grid grid-cols-6 gap-2">
+            {gifts.slice(0, 12).map((g) => (
+              <button key={g.id} onClick={() => sendGift(g)} className="flex flex-col items-center p-1.5 rounded-xl hover:bg-surface-overlay active:scale-95 transition-all">
+                {g.imageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={`${API_ORIGIN}${g.imageUrl}`} alt={g.name} className="h-7 w-7 object-contain" />
+                ) : (
+                  <span className="text-2xl">🎁</span>
+                )}
+                <span className="text-[9px] text-white/50 flex items-center gap-0.5"><CoinIcon size={8} />{g.priceCoins}</span>
+              </button>
+            ))}
+          </div>
+          <button onClick={() => setShowGifts(false)} className="mt-2 w-full h-9 rounded-xl bg-brand-600 text-white text-sm font-semibold">Close</button>
+        </div>
+      )}
+
+      {/* Controls */}
+      {isEndState ? (
+        <div className="absolute bottom-0 inset-x-0 pb-[calc(env(safe-area-inset-bottom)+24px)] px-6">
+          <div className="flex flex-col items-center">
+            <p className="text-sm text-white/60 mb-4">{statusLabel[callState]}</p>
+            <div className="flex gap-3">
+              <Link href={`/app/chat/${id}`} className="h-14 px-6 rounded-full bg-brand-600 text-white flex items-center justify-center text-sm font-semibold active:scale-90 transition-transform">
+                Message
+              </Link>
+              <Link href={`/app/call/${id}?type=${type.toLowerCase()}`} className="h-14 px-6 rounded-full bg-white/10 backdrop-blur border border-white/20 text-white flex items-center justify-center text-sm font-semibold active:scale-90 transition-transform">
+                Call again
+              </Link>
+            </div>
+            <button onClick={() => { window.history.length > 1 ? window.history.back() : (window.location.href = '/app/chat'); }} className="mt-4 text-xs text-white/50 hover:text-white">
+              Close
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="absolute bottom-0 inset-x-0 pb-[calc(env(safe-area-inset-bottom)+24px)]">
+          {type === 'VIDEO' && (
+            <div className="flex justify-center gap-3 mb-6">
+              {[
+                { label: 'Gift', icon: <GiftIcon />, onClick: () => setShowGifts((s) => !s) },
+                { label: 'Chat', icon: <ChatDotIcon />, onClick: () => {} },
+                { label: 'Speaker', icon: <SpeakerIcon />, onClick: () => setSpeakerOn((v) => !v) },
+                { label: 'Report', icon: <FlagIcon />, onClick: report },
+              ].map((b, i) => (
+                <button key={i} onClick={b.onClick} className="h-12 w-12 rounded-full bg-white/10 backdrop-blur border border-white/20 flex items-center justify-center active:scale-90 transition-transform" aria-label={b.label}>
+                  {b.icon}
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="flex items-center justify-center gap-5">
+            <button
+              onClick={toggleMic}
+              className={`h-14 w-14 rounded-full flex items-center justify-center transition-transform active:scale-90 ${micOn ? 'bg-white/10 backdrop-blur border border-white/20' : 'bg-red-500'}`}
+              aria-label="Toggle microphone"
+            >
+              {micOn ? <MicIcon /> : <MicOffIcon />}
+            </button>
+            {type === 'VIDEO' && (
+              <button
+                onClick={toggleCam}
+                className={`h-14 w-14 rounded-full flex items-center justify-center transition-transform active:scale-90 ${camOn ? 'bg-white/10 backdrop-blur border border-white/20' : 'bg-red-500'}`}
+                aria-label="Toggle camera"
+              >
+                {camOn ? <VideoIcon /> : <CameraOffIcon />}
+              </button>
+            )}
+            <button
+              onClick={() => setSpeakerOn((v) => !v)}
+              className="h-14 w-14 rounded-full bg-white/10 backdrop-blur border border-white/20 flex items-center justify-center active:scale-90"
+              aria-label="Toggle speaker"
+            >
+              {speakerOn ? <SpeakerIcon /> : <SpeakerMutedIcon />}
+            </button>
+            {type !== 'VIDEO' && (
+              <>
+                <button
+                  onClick={() => setShowGifts((s) => !s)}
+                  className="h-14 w-14 rounded-full bg-white/10 backdrop-blur border border-white/20 flex items-center justify-center active:scale-90"
+                  aria-label="Gift"
+                >
+                  <GiftIcon />
+                </button>
+                <button
+                  onClick={report}
+                  className="h-14 w-14 rounded-full bg-white/10 backdrop-blur border border-white/20 flex items-center justify-center active:scale-90"
+                  aria-label="Report"
+                >
+                  <FlagIcon />
+                </button>
+              </>
+            )}
+            <button
+              onClick={endCall}
+              className="h-16 w-16 rounded-full bg-red-600 flex items-center justify-center shadow-lg active:scale-90 transition-transform"
+              aria-label="End call"
+            >
+              <CloseIcon />
+            </button>
+          </div>
+          <div className="text-center mt-5 text-[11px] text-white/50">
+            {callState === 'connecting' ? 'Calling…' : callState === 'connected' ? 'Tap end to hang up' : statusLabel[callState]}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SpeakerMutedIcon() {  return (
+    <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+      <line x1="23" y1="9" x2="17" y2="15" />
+      <line x1="17" y1="9" x2="23" y2="15" />
+    </svg>
+  );
+}
+
+function ChatDotIcon() {
+  return (
+    <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+    </svg>
+  );
+}

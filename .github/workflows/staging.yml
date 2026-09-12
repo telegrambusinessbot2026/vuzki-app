@@ -1,0 +1,85 @@
+name: Deploy Staging
+
+# VUZKI - Staging deployment.
+# Triggered manually or on push to `develop`. Builds images, runs migrations,
+# deploys, then runs smoke tests against the /health and /ready endpoints.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [develop]
+
+concurrency:
+  group: staging
+  cancel-in-progress: false
+
+env:
+  IMAGE_REGISTRY: ${{ secrets.REGISTRY_URL }}
+  STAGING_HOST: ${{ secrets.STAGING_HOST }}
+  STAGING_USER: ${{ secrets.STAGING_USER }}
+  STAGING_KEY: ${{ secrets.STAGING_SSH_KEY }}
+
+jobs:
+  build-and-deploy:
+    name: Build, migrate, deploy, smoke-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.IMAGE_REGISTRY }}
+          username: ${{ secrets.REGISTRY_USER }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Build and push images
+        uses: docker/bake-action@v5
+        with:
+          files: infrastructure/docker/docker-compose.yml
+          targets: api worker web admin
+          push: true
+        env:
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+          REDIS_URL: ${{ secrets.STAGING_REDIS_URL }}
+          JWT_SECRET: ${{ secrets.STAGING_JWT_SECRET }}
+          JWT_REFRESH_SECRET: ${{ secrets.STAGING_JWT_REFRESH_SECRET }}
+          SESSION_SECRET: ${{ secrets.STAGING_SESSION_SECRET }}
+
+      - name: Deploy to staging
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ env.STAGING_HOST }}
+          username: ${{ env.STAGING_USER }}
+          key: ${{ env.STAGING_KEY }}
+          script: |
+            set -e
+            cd /srv/vuzki/staging
+            docker pull ${{ env.IMAGE_REGISTRY }}/vuzki-api:latest
+            docker pull ${{ env.IMAGE_REGISTRY }}/vuzki-worker:latest
+            docker pull ${{ env.IMAGE_REGISTRY }}/vuzki-web:latest
+            docker pull ${{ env.IMAGE_REGISTRY }}/vuzki-admin:latest
+            docker compose -f infrastructure/docker/docker-compose.yml --env-file .env.staging up -d migrations
+            docker compose -f infrastructure/docker/docker-compose.yml --env-file .env.staging up -d api worker web admin
+            docker compose -f infrastructure/docker/docker-compose.yml --env-file .env.staging ps
+
+      - name: Smoke tests (health/ready)
+        run: |
+          set -e
+          sleep 15
+          curl --fail --silent --show-error https://staging-api.vuzki.app/health | grep '"status":"ok"'
+          curl --fail --silent --show-error https://staging-api.vuzki.app/ready | grep '"status":"ok"'
+          curl --fail --silent --show-error -o /dev/null https://staging-app.vuzki.app
+
+      - name: Notify on failure
+        if: failure()
+        run: echo "Staging deploy failed - check logs"

@@ -1,0 +1,119 @@
+name: CI
+
+# VUZKI - Pull-request / push quality gate.
+# Runs install, typecheck, lint, unit+integration tests, build and security scans.
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Typecheck, Lint, Test, Build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        workspace: [web, admin, api, website]
+        include:
+          - workspace: web
+            cmd: "npm run typecheck --workspace @vuzki/web && npm run lint --workspace @vuzki/web && npm run build --workspace @vuzki/web"
+          - workspace: admin
+            cmd: "npm run typecheck --workspace @vuzki/admin && npm run lint --workspace @vuzki/admin && npm run build --workspace @vuzki/admin"
+          - workspace: api
+            cmd: "npm run typecheck --workspace @vuzki/api && npm run lint --workspace @vuzki/api && npm run test --workspace @vuzki/api && npm run build --workspace @vuzki/api"
+          - workspace: website
+            cmd: "npm run typecheck --workspace @vuzki/website && npm run lint --workspace @vuzki/website && npm run build --workspace @vuzki/website"
+    env:
+      # Required by prisma generate during api build (schema only; no live DB).
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prisma generate
+        run: npm run db:generate
+
+      - name: Run checks
+        run: ${{ matrix.cmd }}
+
+  # Integration tests that need a real database.
+  integration:
+    name: Integration tests (Postgres)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: vuzki
+          POSTGRES_PASSWORD: vuzki_test
+          POSTGRES_DB: vuzki_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U vuzki"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://vuzki:vuzki_test@localhost:5432/vuzki_test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prisma migrate + seed
+        run: |
+          npm run db:generate
+          npm run db:migrate
+
+      - name: Run API integration tests
+        run: npm run test --workspace @vuzki/api
+
+  security:
+    name: Security scans
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Dependency vulnerability scan
+        run: npm audit --audit-level=high || true
+
+      - name: Secret scanning (trivy secret)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: HIGH,CRITICAL
