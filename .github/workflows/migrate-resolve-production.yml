@@ -1,0 +1,55 @@
+name: Prisma Migrate Resolve (Production)
+
+# VUZKI - ONE-TIME production migration recovery (Step A).
+#
+# Purpose: clear the RECORDED-AS-FAILED state of the migration
+# `20260830000000_init_baseline` in the _prisma_migrations bookkeeping table so
+# the corrected (BOM-free) baseline can be applied later via the existing
+# db-migrate-production.yml workflow. This is bookkeeping ONLY:
+# `prisma migrate resolve --rolled-back` performs NO DDL, NO data change and
+# does NOT touch the schema. It was safe here because the migration previously
+# failed at parse time (UTF-8 BOM), so no application table was created.
+#
+# IMPORTANT:
+# - Manual trigger ONLY (workflow_dispatch). One-time recovery; not part of CI.
+# - Runs ONLY `prisma migrate resolve --rolled-back ...`. It does NOT run
+#   migrate deploy/status, db:push or seed.
+# - DATABASE_URL comes ONLY from the PROD_DATABASE_URL secret. It is never
+#   printed, echoed, or logged. GitHub Actions masks the secret in logs.
+#
+# REQUIRED GITHUB SECRET:
+#   PROD_DATABASE_URL  = Render PostgreSQL EXTERNAL connection string.
+#     (hostname like "...oregon-postgres.render.com"; NEVER the internal URL)
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: production-migrations
+  cancel-in-progress: false
+
+jobs:
+  resolve:
+    name: Mark baseline as rolled back
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npm run db:generate
+
+      - name: Mark migration as rolled back (Step A)
+        run: npx prisma migrate resolve --rolled-back 20260830000000_init_baseline --schema packages/database/prisma/schema.prisma
+        env:
+          DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
