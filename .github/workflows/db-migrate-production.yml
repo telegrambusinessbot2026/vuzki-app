@@ -1,0 +1,66 @@
+name: Prisma Migrate (Production)
+
+# VUZKI - Production database migration.
+#
+# Runs ONLY the version-controlled Prisma migrations (prisma migrate deploy)
+# against the Render PostgreSQL production database. This exists because the
+# Render Free plan does not provide Shell access, so there is no way to run
+# migrations from the Render dashboard.
+#
+# IMPORTANT:
+# - Manual trigger ONLY (workflow_dispatch). Migrations are never run
+#   automatically on push/deploy - a human decides when to apply them.
+# - This DOES NOT deploy anything. It only runs `prisma migrate deploy` and a
+#   read-only `prisma migrate status` pre-check. No Docker, no SSH, no seed.
+# - `prisma migrate deploy` applies committed migrations that have NOT yet been
+#   applied and NEVER auto-drops tables/columns. `db:push` / `db:migrate` /
+#   `db:seed` are explicitly NOT used here (dev/reset/seed behavior).
+# - DATABASE_URL comes ONLY from the PROD_DATABASE_URL secret. It is never
+#   printed, echoed, or logged. GitHub Actions masks the secret in logs.
+#
+# REQUIRED GITHUB SECRET:
+#   PROD_DATABASE_URL  = Render PostgreSQL EXTERNAL connection string.
+#
+#   GitHub runners run OUTSIDE Render's private network and CANNOT reach the
+#   Render INTERNAL database URL (hostname: ...internal.render.com). You MUST
+#   use the EXTERNAL connection string (hostname: ...oregon-postgres.render.com
+#   or similar) shown in the Render PostgreSQL dashboard. The external URL is
+#   reachable over the public internet with its own credentials.
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: production-migrations
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    name: Apply Prisma migrations
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npm run db:generate
+
+      - name: Verify migration state (read-only)
+        run: npx prisma migrate status --schema packages/database/prisma/schema.prisma
+        env:
+          DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+
+      - name: Apply migrations (prisma migrate deploy)
+        run: npx prisma migrate deploy --schema packages/database/prisma/schema.prisma
+        env:
+          DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
