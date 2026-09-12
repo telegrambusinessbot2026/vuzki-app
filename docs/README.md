@@ -20,7 +20,7 @@ packages.
 | --- | --- |
 | Public website (`apps/website`) | Marketing and landing site. |
 | User app (`apps/web`) | The end-user Next.js web application. |
-| Auth | Registration/login with email/phone + OTP, Google and Apple OAuth, refresh tokens, device/session management, password reset. |
+| Auth | Registration/login with email/phone + OTP, refresh tokens, device/session management, password reset. Google and Apple OAuth are NOT enabled yet (frontend buttons hidden until a backend OAuth flow exists). |
 | Profiles | Onboarding, bio, photos, preferences, interests, languages, location, online status. |
 | Discovery | Feed, search, Talk Now candidate queue, filters. |
 | Matching | Likes, super-likes, passes, matches, matching service (AI-assisted matching engine exists). |

@@ -22,8 +22,10 @@ coverage/
 .idea/
 *.tsbuildinfo
 
-# Secrets - never commit
+# Secrets - never commit (real .env files always ignored)
 *.pem
 .env.*
-!*/.env.example
-!
+# Track the .env.example templates (root and any subdirectory) - these contain
+# variable NAMES / placeholders only and are safe to commit.
+!.env.example
+!**/.env.example

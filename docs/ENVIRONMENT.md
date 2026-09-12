@@ -23,7 +23,8 @@ secret manager in production.
 | ------------------- | ----------------- | ---------------------------------------------------------------- |
 | `NODE_ENV`          | `development`     | Runtime environment (`development`, `staging`, `production`).   |
 | `ENVIRONMENT`       | `production`      | Deployment environment label.                                    |
-| `API_PORT`          | `4000`            | Port the API listens on.                                         |
+| `PORT`              | (platform)        | Host-injected port (Render). Falls back to `API_PORT` locally.  |
+| `API_PORT`          | `4000`            | Port the API listens on when `PORT` is not provided.            |
 | `API_HOST`          | `0.0.0.0`         | Bind address for the API.                                        |
 | `API_PUBLIC_URL`    | localhost:4000    | Externally reachable API base URL (used for links/redirects).    |
 | `LOG_LEVEL`         | `debug`/`info`    | Logging verbosity (`debug`, `info`, `warn`, `error`).            |
@@ -35,11 +36,16 @@ secret manager in production.
 
 | Variable                    | Default                        | Purpose                                            |
 | --------------------------- | ------------------------------ | -------------------------------------------------- |
-| `JWT_SECRET`                | dev-insecure placeholder       | Signs access JWTs. Must be strong, unique.         |
-| `JWT_REFRESH_SECRET`        | dev-insecure placeholder       | Signs refresh JWTs. Distinct from `JWT_SECRET`.    |
-| `SESSION_SECRET`            | falls back to `JWT_SECRET`     | Signs session/cookie data (admin & app sessions).  |
+| `JWT_SECRET`                | dev-only placeholder           | Signs access JWTs. **Must be set explicitly in production** (API fails fast otherwise). |
+| `JWT_REFRESH_SECRET`        | dev-only placeholder           | Signs refresh JWTs. Distinct from `JWT_SECRET`. **Required in production.** |
+| `SESSION_SECRET`            | falls back to `JWT_SECRET`     | Signs session/cookie data (admin & app sessions). **Required in production.** |
+| `ADMIN_JWT_SECRET`          | dev-only placeholder / `JWT_SECRET` | Signs admin tokens separately from user tokens. **Required in production.** |
 | `ACCESS_TOKEN_TTL`          | `15m`                          | Access token lifetime (e.g. `15m`, `1h`).          |
 | `REFRESH_TOKEN_TTL_DAYS`    | `30`                           | Refresh token lifetime in days.                    |
+
+> Note: In development, missing JWT secrets fall back to local dev-only defaults.
+> In `production`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, `SESSION_SECRET` and
+> `ADMIN_JWT_SECRET` must all be present or the API refuses to start.
 
 ---
 
@@ -105,6 +111,11 @@ private network with TLS + auth.
 
 ## OAuth
 
+> **Status: not implemented yet.** Google/Apple OAuth are not wired end-to-end
+> (no authorization redirect, callback, code/token exchange, ID-token
+> verification, account linking, or token issuance). The frontend hides the
+> Google/Apple buttons. Values below are reserved for a future OAuth flow.
+
 | Variable                | Default | Purpose                                   |
 | ----------------------- | ------- | ----------------------------------------- |
 | `GOOGLE_CLIENT_ID`      | (empty) | Google OAuth client id.                   |
@@ -120,7 +131,8 @@ private network with TLS + auth.
 
 | Variable                     | Default   | Purpose                                       |
 | ---------------------------- | --------- | --------------------------------------------- |
-| `PAYMENT_PROVIDER`           | `demo`    | `demo` \| `razorpay` \| `cashfree` \| `stripe`. Staging/prod must not be `demo`. |
+| `PAYMENT_PROVIDER`           | `demo`    | `demo` \| `razorpay` \| `cashfree` \| `stripe` \| `phonepe`. Staging/prod must not be `demo`. |
+| `DEMO_MODE`                  | `false`   | Enables demo payment provider behavior.       |
 | `RAZORPAY_KEY_ID`           | (empty)   | Razorpay key id.                              |
 | `RAZORPAY_KEY_SECRET`       | (empty)   | Razorpay key secret.                          |
 | `RAZORPAY_WEBHOOK_SECRET`   | (empty)   | Razorpay webhook signature secret.            |
@@ -128,6 +140,12 @@ private network with TLS + auth.
 | `STRIPE_WEBHOOK_SECRET`     | (empty)   | Stripe webhook signature secret.              |
 | `CASHFREE_CLIENT_ID`        | (empty)   | Cashfree client id.                           |
 | `CASHFREE_CLIENT_SECRET`    | (empty)   | Cashfree client secret.                       |
+| `WEBHOOK_SECRET`            | (empty)   | Shared secret authenticating provider webhooks / signing keys (non-demo fulfillment). |
+| `PHONEPE_MERCHANT_ID`       | (empty)   | PhonePe merchant id.                          |
+| `PHONEPE_CLIENT_ID`         | (empty)   | PhonePe client id.                            |
+| `PHONEPE_CLIENT_SECRET`     | (empty)   | PhonePe client secret.                        |
+| `PHONEPE_SALT_KEY`          | (empty)   | PhonePe salt key.                             |
+| `PHONEPE_SALT_INDEX`        | (empty)   | PhonePe salt index.                           |
 
 ---
 
