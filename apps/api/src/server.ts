@@ -1,6 +1,3 @@
-// Temporary startup diagnostic; must be the first import so it runs before
-// the config/app modules are evaluated.
-import './boot';
 import { createServer } from 'http';
 import { config } from './config';
 import { createApp } from './app';
