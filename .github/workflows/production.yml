@@ -110,8 +110,8 @@ jobs:
         run: |
           set -e
           sleep 20
-          curl --fail --silent --show-error https://api.vuzki.app/health  | grep '"status":"ok"'
-          curl --fail --silent --show-error https://api.vuzki.app/ready   | grep '"status":"ok"'
+          curl --fail --silent --show-error https://vuzki-api.onrender.com/health  | grep '"status":"ok"'
+          curl --fail --silent --show-error https://vuzki-api.onrender.com/ready   | grep '"status":"ok"'
 
       - name: Verify critical services
         uses: appleboy/ssh-action@v1.2.0

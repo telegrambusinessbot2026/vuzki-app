@@ -48,9 +48,9 @@ services:
         value: production
       # ---- Public / browser-safe (NEXT_PUBLIC_* are inlined at build time) ----
       - key: NEXT_PUBLIC_API_URL
-        value: https://api.vuzki.app/api/v1
+        value: https://vuzki-api.onrender.com/api/v1
       - key: NEXT_PUBLIC_SOCKET_URL
-        value: https://api.vuzki.app
+        value: https://vuzki-api.onrender.com
       - key: NEXT_PUBLIC_APP_NAME
         value: VUZKI
       - key: NEXT_PUBLIC_SITE_URL
@@ -58,7 +58,7 @@ services:
 
   # ------------------------------------------------------------------
   # VUZKI API (apps/api) - separate backend service.
-  # https://api.vuzki.app  (Express REST + Socket.IO realtime)
+  # https://vuzki-api.onrender.com  (Express REST + Socket.IO realtime)
   #
   # Uncomment and fill secret env vars from the Render dashboard /
   # secret manager when you are ready to deploy the backend:
@@ -80,7 +80,7 @@ services:
   #     - key: API_HOST
   #       value: 0.0.0.0
   #     - key: API_PUBLIC_URL
-  #       value: https://api.vuzki.app
+  #       value: https://vuzki-api.onrender.com
   #     # Frontend domain(s) that call the API. The single frontend runs on
   #     # https://vuzki.app, so vuzki.app MUST be in this list.
   #     - key: CORS_ORIGINS
