@@ -178,7 +178,7 @@ export default function ChatRoomPage() {
 
     return () => offs.forEach((f) => f());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [on, conversationId, emit]);
+  }, [on, conversationId, emit, socket]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
