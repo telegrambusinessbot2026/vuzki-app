@@ -69,7 +69,7 @@ adminRoutes.post('/login', wrap(async (req, res) => {
     throw new ApiErrorResponse(401, 'INVALID_ADMIN_CREDENTIALS', 'Invalid admin credentials');
   }
   await prisma.admin.update({ where: { id: admin.id }, data: { lastLoginAt: new Date() } });
-  const token = jwt.sign({ adminId: admin.id, role: admin.role, email: admin.email }, config.jwtSecret, { expiresIn: '12h' });
+  const token = jwt.sign({ adminId: admin.id, role: admin.role, email: admin.email }, config.adminJwtSecret, { expiresIn: '12h' });
   res.json({ success: true, data: { token, admin: { id: admin.id, name: admin.name, email: admin.email, role: admin.role } } });
 }));
 
