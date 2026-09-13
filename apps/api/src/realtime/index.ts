@@ -3,6 +3,7 @@ import { Server as HttpServer } from 'http';
 import jwt from 'jsonwebtoken';
 import { config } from '../config';
 import { prisma } from '@vuzki/database';
+import { allowedOrigins } from '../middleware/security';
 import { getSocketIds, setIo, registerSocket, unregisterSocket } from '../services/notification';
 import {
   acceptCall,
@@ -55,7 +56,7 @@ type Socket = any;
 export function createRealtimeServer(httpServer: HttpServer) {
   const io = new Server(httpServer, {
     cors: {
-      origin: [config.webUrl, config.adminUrl, 'http://localhost:3000', 'http://localhost:3001'],
+      origin: allowedOrigins(),
       credentials: true,
     },
   });
