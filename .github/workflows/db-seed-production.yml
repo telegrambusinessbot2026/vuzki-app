@@ -75,6 +75,9 @@ jobs:
       - name: Generate Prisma client
         run: npm run db:generate
 
+      - name: Build @vuzki/shared
+        run: npm run build --workspace @vuzki/shared
+
       # Runs packages/database/seed/index.ts via `npm run db:seed`. Idempotent.
       - name: Seed production database (idempotent)
         run: npm run db:seed
