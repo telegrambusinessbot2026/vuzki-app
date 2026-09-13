@@ -242,7 +242,9 @@ export default function ChatRoomPage() {
       (res: any) => {
         if (res?.ok && res.message) {
           const dto = res.message as ChatMessage;
-          setMessages((m) => m.map((x) => (x.id === localId ? dto : x)));
+          setMessages((m) => [
+            ...m.filter((x) => x.id !== dto.id).map((x) => (x.id === localId ? dto : x)),
+          ]);
         }
       }
     );
