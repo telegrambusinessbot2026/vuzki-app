@@ -747,8 +747,8 @@ async function handleSendMessage(io: Server, socket: Socket, userId: string, pay
       replyToId,
       giftId,
       onMessage: (dto) => {
-        io.to(`conv:${conversationId}`).emit('message:received', dto);
-        emitToRoom(io, conversationId, 'message:received', dto);
+        emitToUser(io, userId, 'message:received', dto);
+        emitToUser(io, otherId, 'message:received', { ...dto, isMine: false });
       },
     });
 
