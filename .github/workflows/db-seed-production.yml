@@ -1,0 +1,82 @@
+name: Prisma Seed (Production)
+
+# VUZKI - Production database seed (bootstrap + reference data).
+#
+# READ THIS BEFORE RUNNING:
+# - Manual trigger ONLY (workflow_dispatch). This NEVER runs automatically on
+#   push, schedule, or after a deploy. A human must go to the Actions tab,
+#   select "Prisma Seed (Production)", type a run reason, and set
+#   CONFIRM_SEED = "YES". The guard step aborts the run for anything else.
+# - It ONLY runs the existing Prisma seed (`npm run db:seed` ->
+#   packages/database/seed/index.ts). It does NOT touch the schema: no
+#   `prisma migrate dev`, no `prisma db push`, no `prisma migrate reset`, and
+#   no DROP/RESET/DELETE of any table. Seeding is idempotent (all upserts with
+#   an empty `update: {}`) and creates reference data plus the bootstrap admin
+#   only when those rows do not already exist. Existing rows are never
+#   overwritten.
+# - SECURITY: the seed creates a bootstrap SUPER_ADMIN (admin@vuzki.app) with a
+#   HARD-CODED bootstrap password committed in the seed file. IMMEDIATELY after
+#   the first successful seed: log in, rotate that password, and/or create
+#   role-scoped admins via POST /admin/create, then deactivate the bootstrap
+#   account. Never use the bootstrap credential in production.
+# - DATABASE_URL comes ONLY from the PROD_DATABASE_URL secret. It is never
+#   printed, echoed, or logged; GitHub Actions masks the secret value in logs.
+#
+# REQUIRED GITHUB SECRET:
+#   PROD_DATABASE_URL  = Render PostgreSQL EXTERNAL connection string.
+#   GitHub runners run OUTSIDE Render's private network and CANNOT reach the
+#   Render INTERNAL database URL (hostname: ...internal.render.com). Use the
+#   EXTERNAL connection string shown in the Render PostgreSQL dashboard.
+#
+# If you only need to apply migrations, use db-migrate-production.yml instead.
+
+on:
+  workflow_dispatch:
+    inputs:
+      CONFIRM_SEED:
+        description: Type YES to run the seed against the production database
+        required: true
+        default: "NO"
+        type: choice
+        options:
+          - "NO"
+          - "YES"
+
+concurrency:
+  group: production-seed
+  cancel-in-progress: false
+
+jobs:
+  seed:
+    name: Seed production database
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      # Abort before anything else unless the human explicitly types YES.
+      - name: Manual confirmation guard
+        run: |
+          if [ "${{ github.event.inputs.CONFIRM_SEED }}" != "YES" ]; then
+            echo "::error::Aborted. Set CONFIRM_SEED=YES to run the seed against production."
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npm run db:generate
+
+      # Runs packages/database/seed/index.ts via `npm run db:seed`. Idempotent.
+      - name: Seed production database (idempotent)
+        run: npm run db:seed
+        env:
+          DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
