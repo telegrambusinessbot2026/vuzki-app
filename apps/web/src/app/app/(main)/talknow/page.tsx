@@ -100,6 +100,7 @@ export default function TalkNowPage() {
       const elapsed = Date.now() - startTimeRef.current;
       if (elapsed > 60000) {
         stopPolling();
+        emit('match:cancel');
         setPhase('no_match');
         loadListeners();
         return;
@@ -119,6 +120,7 @@ export default function TalkNowPage() {
 
     timeoutRef.current = setTimeout(() => {
       stopPolling();
+      emit('match:cancel');
       setPhase('no_match');
       loadListeners();
     }, 60000);

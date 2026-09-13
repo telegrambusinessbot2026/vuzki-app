@@ -11,6 +11,8 @@ import { CloseIcon, MicIcon, MicOffIcon, VideoIcon, CameraOffIcon, GiftIcon, Spe
 
 const API_ORIGIN = API_URL.replace(/\/api\/v1\/?$/, '');
 const STUN = 'stun:stun.l.google.com:19302';
+const OFFER_RETRY_MS = 2000;
+const MAX_OFFER_ATTEMPTS = 15; // ~30s before surfacing a failed state
 
 type CallType = 'AUDIO' | 'VIDEO';
 type CallState =
@@ -23,6 +25,8 @@ type CallState =
   | 'cancelled'
   | 'rate_limited'
   | 'offline'
+  | 'insufficient'
+  | 'failed'
   | 'gift';
 
 interface CallGift {
@@ -61,6 +65,7 @@ export default function CallScreen() {
   const [showGifts, setShowGifts] = useState(false);
   const [gifts, setGifts] = useState<CallGift[]>([]);
   const [giftsToast, setGiftsToast] = useState<string | null>(null);
+  const [insufficientDetails, setInsufficientDetails] = useState<{ balance?: number; required?: number } | null>(null);
 
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
@@ -72,17 +77,57 @@ export default function CallScreen() {
   const timerStarted = useRef(false);
   const facingRef = useRef('user');
   const initializedRef = useRef(false);
+  const callStateRef = useRef<CallState>(callState);
+  const pendingCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
+  const remoteAnsweredRef = useRef(false);
+  const offerAttemptsRef = useRef(0);
+  const offerRetryRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const setStatus = useCallback((st: CallState) => {
+    callStateRef.current = st;
     setCallState(st);
     if (st === 'connected') {
       timerStarted.current = true;
-    } else if (st === 'ended' || st === 'missed' || st === 'rejected' || st === 'cancelled' || st === 'busy') {
+    } else if (st === 'ended' || st === 'missed' || st === 'rejected' || st === 'cancelled' || st === 'busy' || st === 'failed') {
       timerStarted.current = false;
     }
   }, []);
 
-  const isEndState = ['ended', 'missed', 'rejected', 'cancelled', 'busy', 'rate_limited', 'offline'].includes(callState);
+  const pushOffer = useCallback(() => {
+    const pc = pcRef.current;
+    if (!pc || remoteAnsweredRef.current || pc.connectionState === 'connected') return;
+    const desc = pc.localDescription;
+    if (!desc || desc.type !== 'offer') return;
+    emit('call:signal', { callId: callIdRef.current, to: otherIdRef.current, event: 'offer', data: { sdp: desc } });
+  }, [emit]);
+
+  const stopOfferRetry = useCallback(() => {
+    if (offerRetryRef.current) {
+      clearInterval(offerRetryRef.current);
+      offerRetryRef.current = null;
+    }
+  }, []);
+
+  const startOfferRetry = useCallback(() => {
+    if (offerRetryRef.current) return;
+    offerRetryRef.current = setInterval(() => {
+      const pc = pcRef.current;
+      if (!pc) return;
+      if (remoteAnsweredRef.current || callStateRef.current !== 'connecting' || pc.connectionState === 'connected') {
+        stopOfferRetry();
+        return;
+      }
+      offerAttemptsRef.current += 1;
+      if (offerAttemptsRef.current >= MAX_OFFER_ATTEMPTS) {
+        setStatus('failed');
+        stopOfferRetry();
+        return;
+      }
+      pushOffer();
+    }, OFFER_RETRY_MS);
+  }, [pushOffer, setStatus, stopOfferRetry]);
+
+  const isEndState = ['ended', 'missed', 'rejected', 'cancelled', 'busy', 'rate_limited', 'offline', 'insufficient', 'failed'].includes(callState);
 
   // load gifts for in-call gifting
   useEffect(() => {
@@ -115,10 +160,13 @@ export default function CallScreen() {
         emit('call:connection', { callId, status: 'CONNECTED' });
       } else if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
         emit('call:connection', { callId, status: 'DISCONNECTED' });
+        if (pc.connectionState === 'failed' && callStateRef.current === 'connecting') {
+          setStatus('failed');
+        }
       }
     };
     return pc;
-  }, [emit]);
+  }, [emit, setStatus]);
 
   const initVideo = useCallback(async (callId: string, forOffer: boolean) => {
     try {
@@ -132,7 +180,8 @@ export default function CallScreen() {
       if (forOffer) {
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
-        emit('call:signal', { callId, to: otherIdRef.current, event: 'offer', data: { sdp: pc.localDescription } });
+        pushOffer();
+        startOfferRetry();
       }
     } catch {
       /* permission denied - proceed without local media */
@@ -140,10 +189,11 @@ export default function CallScreen() {
       if (forOffer) {
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
-        emit('call:signal', { callId, to: otherIdRef.current, event: 'offer', data: { sdp: pc.localDescription } });
+        pushOffer();
+        startOfferRetry();
       }
     }
-  }, [type, setupPeer, emit]);
+  }, [type, setupPeer, pushOffer, startOfferRetry]);
 
   // Main init
   useEffect(() => {
@@ -156,7 +206,11 @@ export default function CallScreen() {
       callIdRef.current = callId;
       joinRoom(`call:${callId}`);
       if (incoming && socket) emit('call:accept', { callId });
-      initVideo(callId, false);
+      initVideo(callId, false).then(() => {
+        // Signal the caller that our peer connection + local media are ready so
+        // it can (re)send the offer instead of relying solely on the retry timer.
+        emit('call:signal', { callId, to: otherIdRef.current, event: 'ready', data: {} });
+      });
     } else {
       // Caller: initiate
       emit(
@@ -172,13 +226,17 @@ export default function CallScreen() {
             const err = res?.error || 'RATE_LIMITED';
             if (err === 'USER_OFFLINE') setStatus('offline');
             else if (err === 'RATE_LIMITED') setStatus('rate_limited');
-            else setStatus('busy');
+            else if (err === 'INSUFFICIENT_BALANCE') {
+              setInsufficientDetails(res?.details ?? null);
+              setStatus('insufficient');
+            } else setStatus('busy');
           }
         }
       );
     }
 
     return () => {
+      stopOfferRetry();
       if (pcRef.current) pcRef.current.close();
       localStreamRef.current?.getTracks().forEach((t) => t.stop());
       const callId = callIdRef.current;
@@ -192,29 +250,59 @@ export default function CallScreen() {
     if (!on) return;
     const offs: (() => void)[] = [];
 
+    const drainPendingCandidates = (pc: RTCPeerConnection) => {
+      const pending = pendingCandidatesRef.current;
+      pendingCandidatesRef.current = [];
+      for (const c of pending) {
+        try {
+          pc.addIceCandidate(c);
+        } catch {
+          /* ignore */
+        }
+      }
+    };
+
     offs.push(
       on('call:signal', async (p: { from: string; callId: string; event: string; data: any }) => {
         if (p.callId !== callIdRef.current) return;
         const pc = pcRef.current;
         if (!pc) return;
-        if (p.event === 'offer') {
+        if (p.event === 'ready') {
+          // Callee's peer connection + local media are ready -> (re)send the offer.
+          pushOffer();
+        } else if (p.event === 'offer') {
+          // Ignore retransmitted offers: never renegotiate while an SDP exchange
+          // is in flight and never answer more than once.
+          if (pc.signalingState !== 'stable' || remoteAnsweredRef.current) return;
           await pc.setRemoteDescription(new RTCSessionDescription(p.data.sdp));
+          remoteAnsweredRef.current = true;
+          drainPendingCandidates(pc);
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
           emit('call:signal', { callId: p.callId, to: otherIdRef.current, event: 'answer', data: { sdp: pc.localDescription } });
         } else if (p.event === 'answer') {
+          if (remoteAnsweredRef.current) return;
+          remoteAnsweredRef.current = true;
+          stopOfferRetry();
           await pc.setRemoteDescription(new RTCSessionDescription(p.data.sdp));
+          drainPendingCandidates(pc);
         } else if (p.event === 'candidate') {
-          try {
-            await pc.addIceCandidate(p.data.candidate);
-          } catch {
-            /* ignore */
+          // Park candidates until the remote description is set; addIceCandidate
+          // fails silently before that, and parked ones are drained above.
+          if (!pc.remoteDescription) {
+            pendingCandidatesRef.current.push(p.data.candidate);
+          } else {
+            try {
+              await pc.addIceCandidate(p.data.candidate);
+            } catch {
+              /* ignore */
+            }
           }
         }
       })
     );
 
-    offs.push(on('call:accepted', () => {}));
+    offs.push(on('call:accepted', () => pushOffer()));
     offs.push(
       on('call:rejected', () => {
         setStatus('rejected');
@@ -262,7 +350,7 @@ export default function CallScreen() {
 
     return () => offs.forEach((f) => f());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [on, emit, callIdRef.current]);
+  }, [on, emit, pushOffer, stopOfferRetry]);
 
   // timer while connected/idle (show elapsed during call)
   useEffect(() => {
@@ -359,6 +447,8 @@ export default function CallScreen() {
     cancelled: 'Call cancelled',
     rate_limited: 'Rate limited — try again in a moment',
     offline: 'User is offline',
+    insufficient: 'Insufficient balance to start calls',
+    failed: 'Call failed',
     gift: '',
   };
 
@@ -440,10 +530,24 @@ export default function CallScreen() {
         <div className="absolute bottom-0 inset-x-0 pb-[calc(env(safe-area-inset-bottom)+24px)] px-6">
           <div className="flex flex-col items-center">
             <p className="text-sm text-white/60 mb-4">{statusLabel[callState]}</p>
+            {callState === 'insufficient' && (
+              <p className="text-sm text-amber-400/90 mb-4">
+                {insufficientDetails?.required
+                  ? `You need at least ${insufficientDetails.required} coins to start this call. `
+                  : 'Add coins to your wallet to start calls. '}
+                Top up below.
+              </p>
+            )}
             <div className="flex gap-3">
-              <Link href={`/app/chat/${id}`} className="h-14 px-6 rounded-full bg-brand-600 text-white flex items-center justify-center text-sm font-semibold active:scale-90 transition-transform">
-                Message
-              </Link>
+              {callState === 'insufficient' ? (
+                <Link href="/app/wallet" className="h-14 px-6 rounded-full bg-brand-600 text-white flex items-center justify-center text-sm font-semibold active:scale-90 transition-transform">
+                  Top up coins
+                </Link>
+              ) : (
+                <Link href={`/app/chat/${id}`} className="h-14 px-6 rounded-full bg-brand-600 text-white flex items-center justify-center text-sm font-semibold active:scale-90 transition-transform">
+                  Message
+                </Link>
+              )}
               <Link href={`/app/call/${id}?type=${type.toLowerCase()}`} className="h-14 px-6 rounded-full bg-white/10 backdrop-blur border border-white/20 text-white flex items-center justify-center text-sm font-semibold active:scale-90 transition-transform">
                 Call again
               </Link>

@@ -322,7 +322,7 @@ export function createRealtimeServer(httpServer: HttpServer) {
         ack?.({ ok: true, data: { callId: call.id, type, rate, rtc: { provider: 'webrtc', signaling: 'socket.io' } }, session });
         void session;
       } catch (e: any) {
-        ack?.({ ok: false, error: e?.code || 'INTERNAL', message: e?.message });
+        ack?.({ ok: false, error: e?.code || 'INTERNAL', message: e?.message, ...(e?.details ? { details: e.details } : {}) });
       }
     });
 
