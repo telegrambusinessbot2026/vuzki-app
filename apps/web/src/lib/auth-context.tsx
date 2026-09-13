@@ -11,6 +11,7 @@ export interface AuthUser {
   gender: string;
   age: number | null;
   countryCode: string | null;
+  region: string | null;
   bio: string | null;
   isPremium: boolean;
   premiumTier: string;
@@ -22,6 +23,19 @@ export interface AuthUser {
   languages: string[];
   onboardingStep: string;
   email: string | null;
+  phone: string | null;
+  emailVerified: boolean;
+  phoneVerified: boolean;
+  theme?: string;
+  language?: string;
+  preferences?: Partial<{
+    whoCanMessage: string;
+    whoCanCall: string;
+    showOnlineStatus: boolean;
+    allowPushNotifications: boolean;
+    allowEmailNotifications: boolean;
+    allowMarketing: boolean;
+  }>;
   referralCode?: string | null;
   wallet?: { balance: number; currency: string };
   needsOnboarding?: boolean;

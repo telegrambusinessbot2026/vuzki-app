@@ -19,6 +19,7 @@ export default function OtherProfilePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [following, setFollowing] = useState(false);
+  const [followPending, setFollowPending] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -26,7 +27,9 @@ export default function OtherProfilePage() {
     setError('');
     api<{ user: PublicUser }>(`/users/${id}`, { auth: true })
       .then((data) => {
-        if (!cancelled) setUser(mapUser(data.user));
+        if (cancelled) return;
+        setUser(mapUser(data.user));
+        setFollowing(!!data.user.isFollowing);
       })
       .catch((e) => {
         if (!cancelled) setError(e?.message || 'Could not load profile');
@@ -38,6 +41,26 @@ export default function OtherProfilePage() {
       cancelled = true;
     };
   }, [id]);
+
+  const toggleFollow = async () => {
+    if (!user) return;
+    setFollowPending(true);
+    try {
+      if (following) {
+        const r = await api<{ followers?: number }>(`/users/${user.id}/follow`, { method: 'DELETE', auth: true });
+        setFollowing(false);
+        setUser((prev) => (prev ? { ...prev, followers: r.followers ?? prev.followers } : prev));
+      } else {
+        const r = await api<{ followers?: number }>(`/users/${user.id}/follow`, { method: 'POST', auth: true });
+        setFollowing(true);
+        setUser((prev) => (prev ? { ...prev, followers: r.followers ?? prev.followers } : prev));
+      }
+    } catch {
+      /* server rejected the toggle - keep the current state */
+    } finally {
+      setFollowPending(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -150,7 +173,8 @@ export default function OtherProfilePage() {
           variant={following ? 'secondary' : 'primary'}
           size="md"
           full
-          onClick={() => setFollowing((f) => !f)}
+          loading={followPending}
+          onClick={toggleFollow}
         >
           {following ? 'Following' : 'Follow'}
         </Button>

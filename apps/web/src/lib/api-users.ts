@@ -23,6 +23,10 @@ export interface PublicUser {
   status: string;
   rating?: number | null;
   isOwn?: boolean;
+  isFollowing?: boolean;
+  followers?: number;
+  following?: number;
+  profileViews?: number;
 }
 
 export type FeedUser = MockUser & {
@@ -54,14 +58,15 @@ export function mapUser(u: PublicUser, extra?: { compatibilityScore?: number; ma
     interests: u.interests ?? [],
     languages: u.languages ?? [],
     badges,
-    profileViews: 0,
-    followers: 0,
-    following: 0,
+    profileViews: u.profileViews ?? 0,
+    followers: u.followers ?? 0,
+    following: u.following ?? 0,
     rating: u.rating ?? undefined,
   };
   const out = {
     ...base,
     premiumTier: u.premiumTier ?? 'FREE',
+    isFollowing: u.isFollowing ?? false,
     compatibilityScore: extra?.compatibilityScore,
     matchLabel: extra?.matchLabel,
   };

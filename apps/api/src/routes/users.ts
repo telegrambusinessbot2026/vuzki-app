@@ -2,13 +2,25 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '@vuzki/database';
 import { ApiErrorResponse } from '@vuzki/types';
-import { ageFromDateOfBirth, isAdult, sanitizeProfilePreference, validateUrl } from '@vuzki/utils';
+import { ageFromDateOfBirth, isAdult, isValidEmail, isValidPhone, sanitizeProfilePreference, validateUrl } from '@vuzki/utils';
 import { wrap, toPublicUser, toSelfUser } from './helpers';
 import { authenticate, AuthedRequest } from '../middleware/auth';
+import { verifyOtp } from '../services/otp';
 import { AccountStatus, OnboardingStep, WalletTransactionType } from '@vuzki/shared';
 import { debitCoins } from '../services/wallet';
 
 export const userRoutes = Router();
+
+// Real DB-backed profile engagement stats (followers / following / profile
+// views). Counts come from the Follow and ProfileView tables - never mocks.
+export async function getProfileStats(userId: string) {
+  const [followers, following, profileViews] = await Promise.all([
+    prisma.follow.count({ where: { followingId: userId } }),
+    prisma.follow.count({ where: { followerId: userId } }),
+    prisma.profileView.count({ where: { profileOwnerId: userId } }),
+  ]);
+  return { followers, following, profileViews };
+}
 
 // GET /users/:id - public profile
 userRoutes.get('/:id', authenticate(), wrap(async (req: AuthedRequest, res) => {
@@ -18,10 +30,60 @@ userRoutes.get('/:id', authenticate(), wrap(async (req: AuthedRequest, res) => {
   });
   if (!user || user.deletedAt) throw new ApiErrorResponse(404, 'USER_NOT_FOUND', 'User not found');
 
+  const viewerId = req.auth!.userId;
+  const isOwn = user.id === viewerId;
+  const [stats, isFollowing] = await Promise.all([
+    getProfileStats(user.id),
+    isOwn ? Promise.resolve(false) : prisma.follow.findUnique({
+      where: { followerId_followingId: { followerId: viewerId, followingId: user.id } },
+    }),
+  ]);
+
+  // Record the view (idempotent per viewer/owner pair) when someone visits
+  // another user's profile. Never counted for the owner themselves.
+  if (!isOwn) {
+    await prisma.profileView.upsert({
+      where: { viewerId_profileOwnerId: { viewerId, profileOwnerId: user.id } },
+      update: { createdAt: new Date() },
+      create: { viewerId, profileOwnerId: user.id },
+    });
+  }
+
   const dto = toPublicUser(user);
-  const isOwn = user.id === req.auth!.userId;
-  // only show creator rating/public bits
-  res.json({ success: true, data: { user: { ...dto, isOwn } } });
+  res.json({
+    success: true,
+    data: { user: { ...dto, isOwn, isFollowing: Boolean(isFollowing), followers: stats.followers, following: stats.following, profileViews: stats.profileViews } },
+  });
+}));
+
+// POST /users/:id/follow
+userRoutes.post('/:id/follow', authenticate(), wrap(async (req: AuthedRequest, res) => {
+  const me = req.auth!.userId;
+  const otherId = req.params.id;
+  if (me === otherId) throw new ApiErrorResponse(400, 'BAD_REQUEST', 'Cannot follow yourself');
+
+  const other = await prisma.user.findUnique({ where: { id: otherId } });
+  if (!other || other.deletedAt) throw new ApiErrorResponse(404, 'USER_NOT_FOUND', 'User not found');
+
+  await prisma.follow.upsert({
+    where: { followerId_followingId: { followerId: me, followingId: otherId } },
+    update: {},
+    create: { followerId: me, followingId: otherId },
+  });
+
+  const stats = await getProfileStats(otherId);
+  res.json({ success: true, data: { ...stats, following: true } });
+}));
+
+// DELETE /users/:id/follow
+userRoutes.delete('/:id/follow', authenticate(), wrap(async (req: AuthedRequest, res) => {
+  const me = req.auth!.userId;
+  const otherId = req.params.id;
+  await prisma.follow.deleteMany({
+    where: { followerId: me, followingId: otherId },
+  });
+  const stats = await getProfileStats(otherId);
+  res.json({ success: true, data: { ...stats, following: false } });
 }));
 
 // GET /users/me/profile
@@ -38,11 +100,13 @@ userRoutes.get('/me/profile', authenticate(), wrap(async (req: AuthedRequest, re
   });
   if (!user) throw new ApiErrorResponse(404, 'USER_NOT_FOUND', 'User not found');
   const dto = toSelfUser(user);
+  const stats = await getProfileStats(user.id);
   res.json({
     success: true,
     data: {
       user: {
         ...dto,
+        ...stats,
         stats: {
           likesReceived: user._count.likesReceived,
           matches: user._count.matchesA + user._count.matchesB,
@@ -66,6 +130,8 @@ const updateProfileSchema = z.object({
   interests: z.array(z.string()).max(20).optional(),
   languages: z.array(z.string()).max(10).optional(),
   onboardingStep: z.enum(['NONE', 'INTERESTS', 'LANGUAGES', 'PROFILE', 'COMPLETE']).optional(),
+  theme: z.enum(['dark', 'light']).optional(),
+  language: z.string().min(2).max(10).optional(),
   preferences: z.object({
     ageRangeFrom: z.number().min(18).optional(),
     ageRangeTo: z.number().max(99).optional(),
@@ -76,6 +142,13 @@ const updateProfileSchema = z.object({
     publicProfileEnabled: z.boolean().optional(),
     onlinePreference: z.boolean().optional(),
     verifiedPreference: z.boolean().optional(),
+    onlineVisibility: z.enum(['everyone', 'premium', 'nobody']).optional(),
+    whoCanMessage: z.enum(['everyone', 'followers', 'nobody']).optional(),
+    whoCanCall: z.enum(['everyone', 'verified', 'creators', 'followers', 'nobody']).optional(),
+    showReadReceipts: z.boolean().optional(),
+    allowPushNotifications: z.boolean().optional(),
+    allowEmailNotifications: z.boolean().optional(),
+    allowMarketing: z.boolean().optional(),
   }).optional(),
 });
 
@@ -112,6 +185,8 @@ userRoutes.put('/me/profile', authenticate(), wrap(async (req: AuthedRequest, re
         avatarUrl: body.avatarUrl,
         bannerUrl: body.bannerUrl,
         onboardingStep: body.onboardingStep,
+        theme: body.theme,
+        language: body.language,
       },
     });
 
@@ -165,6 +240,56 @@ userRoutes.post('/me/location', authenticate(), wrap(async (req: AuthedRequest, 
     data: { latitude, longitude, locationUpdatedAt: new Date() },
   });
   res.json({ success: true });
+}));
+
+// PUT /users/me/email - change the account email (OTP-guarded, verified)
+userRoutes.put('/me/email', authenticate(), wrap(async (req: AuthedRequest, res) => {
+  const { email, otp } = z.object({
+    email: z.string(),
+    otp: z.string().min(4).max(8),
+  }).parse(req.body);
+
+  if (!isValidEmail(email)) throw new ApiErrorResponse(400, 'INVALID_EMAIL', 'Invalid email');
+
+  const existing = await prisma.user.findUnique({ where: { email } });
+  if (existing && existing.id !== req.auth!.userId) {
+    throw new ApiErrorResponse(409, 'EMAIL_TAKEN', 'Email already in use');
+  }
+
+  await verifyOtp(email, otp, 'registration').catch(() => {
+    throw new ApiErrorResponse(401, 'INVALID_OTP', 'Invalid or expired OTP');
+  });
+
+  await prisma.user.update({
+    where: { id: req.auth!.userId },
+    data: { email, emailVerified: true },
+  });
+  res.json({ success: true, data: { email } });
+}));
+
+// PUT /users/me/phone - change the account phone (OTP-guarded, verified)
+userRoutes.put('/me/phone', authenticate(), wrap(async (req: AuthedRequest, res) => {
+  const { phone, otp } = z.object({
+    phone: z.string(),
+    otp: z.string().min(4).max(8),
+  }).parse(req.body);
+
+  if (!isValidPhone(phone)) throw new ApiErrorResponse(400, 'INVALID_PHONE', 'Invalid phone');
+
+  const existing = await prisma.user.findUnique({ where: { phone } });
+  if (existing && existing.id !== req.auth!.userId) {
+    throw new ApiErrorResponse(409, 'PHONE_TAKEN', 'Phone already in use');
+  }
+
+  await verifyOtp(phone, otp, 'registration').catch(() => {
+    throw new ApiErrorResponse(401, 'INVALID_OTP', 'Invalid or expired OTP');
+  });
+
+  await prisma.user.update({
+    where: { id: req.auth!.userId },
+    data: { phone, phoneVerified: true },
+  });
+  res.json({ success: true, data: { phone } });
 }));
 
 // POST /users/:id/super-like (legacy convenience)

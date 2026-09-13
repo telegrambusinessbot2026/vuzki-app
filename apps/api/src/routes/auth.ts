@@ -282,6 +282,38 @@ authRoutes.post('/logout', authenticate(), wrap(async (req: AuthedRequest, res) 
   res.json({ success: true });
 }));
 
+// POST /auth/change-password - change the password for a logged-in local account
+authRoutes.post('/change-password', authenticate(), wrap(async (req: AuthedRequest, res) => {
+  const { currentPassword, newPassword } = z.object({
+    currentPassword: z.string().min(1),
+    newPassword: z.string().min(8),
+  }).parse(req.body);
+
+  if (!isValidPassword(newPassword)) throw new ApiErrorResponse(400, 'WEAK_PASSWORD', 'Weak password');
+
+  const user = await prisma.user.findUnique({ where: { id: req.auth!.userId } });
+  if (!user) throw new ApiErrorResponse(404, 'USER_NOT_FOUND', 'User not found');
+  if (user.authProvider !== 'local' || !user.passwordHash) {
+    throw new ApiErrorResponse(400, 'NO_PASSWORD', 'This account has no password (social login)');
+  }
+  if (!(await verifyPassword(currentPassword, user.passwordHash))) {
+    throw new ApiErrorResponse(401, 'INVALID_PASSWORD', 'Current password is incorrect');
+  }
+
+  await prisma.user.update({ where: { id: user.id }, data: { passwordHash: await hashPassword(newPassword) } });
+
+  // Revoke every OTHER active session so a leaked password stops working
+  // elsewhere; the current session stays signed in.
+  if (req.auth?.sessionId) {
+    await prisma.session.updateMany({
+      where: { userId: user.id, isActive: true, id: { not: req.auth.sessionId } },
+      data: { isActive: false },
+    });
+  }
+
+  res.json({ success: true, data: { changed: true } });
+}));
+
 // POST /auth/forgot-password
 authRoutes.post('/forgot-password', rateLimiter(15 * 60 * 1000, 5), wrap(async (req, res) => {
   const { identifier } = z.object({ identifier: z.string() }).parse(req.body);

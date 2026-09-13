@@ -41,6 +41,7 @@ export default function ProfilePage() {
 
   const [history, setHistory] = useState<CallHistoryItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
+  const [stats, setStats] = useState<{ followers: number; following: number; profileViews: number } | null>(null);
 
   useEffect(() => {
     api<{ items: CallHistoryItem[] }>('/calls/history', { auth: true })
@@ -49,10 +50,16 @@ export default function ProfilePage() {
       .finally(() => setHistoryLoading(false));
   }, []);
 
-  const stats = [
-    { label: 'Followers', value: '12.4k' },
-    { label: 'Following', value: '238' },
-    { label: 'Views', value: '48.1k' },
+  useEffect(() => {
+    api<{ user: { followers: number; following: number; profileViews: number } }>('/users/me/profile', { auth: true })
+      .then((d) => setStats({ followers: d.user.followers, following: d.user.following, profileViews: d.user.profileViews }))
+      .catch(() => setStats({ followers: 0, following: 0, profileViews: 0 }));
+  }, []);
+
+  const statRows = [
+    { label: 'Followers', value: stats ? stats.followers.toLocaleString() : '…' },
+    { label: 'Following', value: stats ? stats.following.toLocaleString() : '…' },
+    { label: 'Views', value: stats ? stats.profileViews.toLocaleString() : '…' },
   ];
 
   return (
@@ -79,7 +86,7 @@ export default function ProfilePage() {
           {user.isCreator && <div className="mt-2"><CreatorBadge /></div>}
 
           <div className="grid grid-cols-3 gap-6 mt-5 w-full max-w-xs">
-            {stats.map((s) => (
+            {statRows.map((s) => (
               <div key={s.label} className="text-center">
                 <p className="font-bold text-lg">{s.value}</p>
                 <p className="text-[11px] text-white/50">{s.label}</p>
@@ -88,7 +95,7 @@ export default function ProfilePage() {
           </div>
 
           <div className="flex gap-2.5 mt-5 w-full">
-            <Link href="/app/settings" className="flex-1">
+            <Link href="/app/settings/profile" className="flex-1">
               <Button variant="gradient" size="md" full>Edit Profile</Button>
             </Link>
           </div>
@@ -118,7 +125,7 @@ export default function ProfilePage() {
             <div>
               <p className="text-sm text-white/60">Balance</p>
               <p className="flex items-center gap-1 font-bold text-amber-400">
-                <CoinIcon size={16} /> {user.wallet?.balance?.toLocaleString() ?? '120'} coins
+                <CoinIcon size={16} /> {user.wallet?.balance?.toLocaleString() ?? '0'} coins
               </p>
             </div>
           </div>

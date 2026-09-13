@@ -49,6 +49,8 @@ export function toSelfUser(user: any) {
     dateOfBirth: user.dateOfBirth,
     onboardingStep: user.onboardingStep,
     referralCode: user.referralCode,
+    theme: user.theme,
+    language: user.language,
     wallet: { balance: user.wallet?.balance ?? 0, currency: user.wallet?.currency ?? 'INR' },
     preferences: user.preferences,
     hasActiveSubscription: user.subscriptions?.some((s: any) => s.status === 'ACTIVE') ?? false,

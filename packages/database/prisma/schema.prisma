@@ -48,6 +48,8 @@ model User {
   longitude        Float?
   locationUpdatedAt DateTime?
   lastLoginAt      DateTime?
+  theme            String    @default("dark")
+  language         String    @default("en")
 
   profile          Profile?
   preferences      ProfilePreferences?
@@ -84,6 +86,10 @@ model User {
   reportsReceived  Report[]     @relation("reportsReceived")
   blocksMade       Block[]      @relation("blocksMade")
   blocksReceived   Block[]      @relation("blocksReceived")
+  followers        Follow[]     @relation("followers")
+  follows          Follow[]     @relation("follows")
+  profileViewsReceived ProfileView[] @relation("profileViewsReceived")
+  profileViewsMade ProfileView[] @relation("profileViewsMade")
   moderationActions ModerationAction[]
   boosts           Boost[]
   rewards          Reward[]
@@ -271,10 +277,26 @@ model Match {
 model Follow {
   id         String   @id @default(cuid())
   followerId String
+  follower   User     @relation("followers", fields: [followerId], references: [id], onDelete: Cascade)
   followingId String
+  following  User     @relation("follows", fields: [followingId], references: [id], onDelete: Cascade)
   createdAt  DateTime @default(now())
   @@unique([followerId, followingId])
   @@index([followingId])
+}
+
+// A view is recorded when an authenticated user opens another user's profile.
+// Only unique (viewer, owner) pairs are counted so refresh/back-nav never inflate
+// the number; the row is upserted so revisits simply touch the timestamp.
+model ProfileView {
+  id             String   @id @default(cuid())
+  viewerId       String
+  viewer         User     @relation("profileViewsMade", fields: [viewerId], references: [id], onDelete: Cascade)
+  profileOwnerId String
+  profileOwner   User     @relation("profileViewsReceived", fields: [profileOwnerId], references: [id], onDelete: Cascade)
+  createdAt      DateTime @default(now())
+  @@unique([viewerId, profileOwnerId])
+  @@index([profileOwnerId])
 }
 
 // ============================================================

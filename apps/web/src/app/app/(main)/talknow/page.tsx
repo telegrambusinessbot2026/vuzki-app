@@ -6,7 +6,7 @@ import { useRealtime } from '@/lib/realtime-context';
 import { api, post } from '@/lib/api';
 import { Avatar, VerifiedIcon } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
-import { CloseIcon, PhoneIcon, ChatIcon, RefreshIcon } from '@/components/ui/Icons';
+import { CloseIcon, PhoneIcon, ChatIcon, VideoIcon, RefreshIcon } from '@/components/ui/Icons';
 
 interface MatchedUser {
   id: string;
@@ -210,7 +210,10 @@ export default function TalkNowPage() {
 
           <div className="w-full mt-6 space-y-2.5 max-w-xs">
             <Link href={`/app/call/${match.matchedWith.id}?type=audio&name=${encodeURIComponent(match.matchedWith.displayName)}`}>
-              <Button variant="gradient" size="lg" full icon={<PhoneIcon size={18} />}>Start Call</Button>
+              <Button variant="gradient" size="lg" full icon={<PhoneIcon size={18} />}>Audio Call</Button>
+            </Link>
+            <Link href={`/app/call/${match.matchedWith.id}?type=video&name=${encodeURIComponent(match.matchedWith.displayName)}`}>
+              <Button variant="secondary" size="lg" full icon={<VideoIcon size={18} />}>Video Call</Button>
             </Link>
             <Link href={`/app/chat/${match.matchedWith.id}`}>
               <Button variant="secondary" size="lg" full icon={<ChatIcon size={18} />}>Keep chatting</Button>
@@ -250,9 +253,14 @@ export default function TalkNowPage() {
                     </p>
                     <p className="text-[11px] text-white/50">{l.matchScore}% match{l.sharedInterests.length ? ` · ${l.sharedInterests.join(', ')}` : ''}</p>
                   </div>
-                  <Link href={`/app/call/${l.id}?type=audio&name=${encodeURIComponent(l.displayName)}`}>
-                    <Button variant="gradient" size="sm" icon={<PhoneIcon size={14} />}>Call</Button>
-                  </Link>
+                  <div className="flex gap-1.5">
+                    <Link href={`/app/call/${l.id}?type=audio&name=${encodeURIComponent(l.displayName)}`}>
+                      <Button variant="gradient" size="sm" icon={<PhoneIcon size={14} />}>Audio</Button>
+                    </Link>
+                    <Link href={`/app/call/${l.id}?type=video&name=${encodeURIComponent(l.displayName)}`}>
+                      <Button variant="secondary" size="sm" icon={<VideoIcon size={14} />}>Video</Button>
+                    </Link>
+                  </div>
                 </div>
               ))}
             </div>
