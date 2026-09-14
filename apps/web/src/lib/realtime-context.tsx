@@ -71,13 +71,36 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     const onIncoming = (payload: IncomingCall) => {
       setIncoming(payload);
     };
+    // Clear the floating accept/decline banner once the call is resolved by the
+    // caller or by the server (cancelled/ended/missed/declined/busy/missed-ring).
+    const clearIncoming = (payload: { callId?: string }) => {
+      if (!payload?.callId) return;
+      setIncoming((cur) => (cur && cur.callId === payload.callId ? null : cur));
+    };
 
     s.on('presence:update', onPresence);
     s.on('call:incoming', onIncoming);
+    s.on('call:cancelled', clearIncoming);
+    s.on('call:rejected', clearIncoming);
+    s.on('call:missed', clearIncoming);
+    s.on('call:ended', clearIncoming);
+    s.on('call:busy', clearIncoming);
+    const onCallState = (p: { callId?: string; status?: string }) => {
+      if (p.status && ['ENDED', 'REJECTED', 'CANCELLED', 'MISSED', 'BUSY', 'FAILED'].includes(p.status)) {
+        clearIncoming({ callId: p.callId });
+      }
+    };
+    s.on('call:state', onCallState);
 
     return () => {
       s.off('presence:update', onPresence);
       s.off('call:incoming', onIncoming);
+      s.off('call:cancelled', clearIncoming);
+      s.off('call:rejected', clearIncoming);
+      s.off('call:missed', clearIncoming);
+      s.off('call:ended', clearIncoming);
+      s.off('call:busy', clearIncoming);
+      s.off('call:state', onCallState);
       s.disconnect();
       socketRef.current = null;
       setSocket(null);
@@ -125,7 +148,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   const acceptCall = useCallback(() => {
     if (!incoming) return;
     emit('call:accept', { callId: incoming.callId });
-    router.push(`/app/call/${incoming.from.id}?ongoing=${incoming.callId}`);
+    router.push(`/app/call/${incoming.from.id}?ongoing=${incoming.callId}&type=${incoming.type.toLowerCase()}`);
     setIncoming(null);
   }, [incoming, emit, router]);
 

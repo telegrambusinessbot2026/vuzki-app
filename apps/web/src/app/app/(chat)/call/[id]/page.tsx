@@ -18,6 +18,7 @@ type CallType = 'AUDIO' | 'VIDEO';
 type CallState =
   | 'connecting'
   | 'connected'
+  | 'reconnecting'
   | 'ended'
   | 'missed'
   | 'busy'
@@ -47,8 +48,8 @@ export default function CallScreen() {
   const params = useParams();
   const search = useSearchParams();
   const id = String(params.id);
-  const qType = (search.get('type') as 'audio' | 'video') || 'audio';
-  const type: CallType = qType === 'video' ? 'VIDEO' : 'AUDIO';
+  const rawType = (search.get('type') || 'audio').toLowerCase();
+  const type: CallType = rawType === 'video' ? 'VIDEO' : 'AUDIO';
   const ongoing = search.get('ongoing');
   const incoming = search.get('incoming');
   const presetsName = search.get('name');
@@ -66,6 +67,7 @@ export default function CallScreen() {
   const [gifts, setGifts] = useState<CallGift[]>([]);
   const [giftsToast, setGiftsToast] = useState<string | null>(null);
   const [insufficientDetails, setInsufficientDetails] = useState<{ balance?: number; required?: number } | null>(null);
+  const [audioBlocked, setAudioBlocked] = useState(false);
 
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
@@ -74,12 +76,19 @@ export default function CallScreen() {
   otherIdRef.current = id;
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteAudioRef = useRef<HTMLAudioElement>(null);
   const timerStarted = useRef(false);
   const facingRef = useRef('user');
   const initializedRef = useRef(false);
   const callStateRef = useRef<CallState>(callState);
   const pendingCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
+  // Server-issued TURN credentials (short-lived Twilio NTS ICE servers),
+  // fetched once per call screen. Resolves to [] so a failed fetch simply
+  // keeps the existing STUN-only path — the call must never crash on this.
+  const turnServersRef = useRef<Promise<RTCIceServer[]> | null>(null);
   const remoteAnsweredRef = useRef(false);
+  const acceptedRef = useRef<boolean>(!!ongoing || !!incoming);
+  const wasConnectedRef = useRef(false);
   const offerAttemptsRef = useRef(0);
   const offerRetryRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -137,8 +146,10 @@ export default function CallScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const setupPeer = useCallback((callId: string) => {
-    const pc = new RTCPeerConnection({ iceServers: [{ urls: STUN }] });
+  const setupPeer = useCallback((callId: string, turnIceServers: RTCIceServer[]) => {
+    // STUN first as the baseline; server-issued TURN (and any NTS STUN) follow.
+    const servers: RTCIceServer[] = [{ urls: STUN }, ...(turnIceServers || [])];
+    const pc = new RTCPeerConnection({ iceServers: servers });
     pcRef.current = pc;
 
     const local = localStreamRef.current;
@@ -147,7 +158,22 @@ export default function CallScreen() {
     }
     pc.ontrack = (ev) => {
       if (ev.streams && ev.streams[0]) {
-        if (remoteVideoRef.current) remoteVideoRef.current.srcObject = ev.streams[0];
+        const stream = ev.streams[0];
+        const handleAutoplayRejection = (e: unknown) => {
+          // Audio/video autoplay is blocked by the browser until the user
+          // interacts. Never bypass the restriction — surface a clear action
+          // ("Tap to hear audio") that resumes playback from the click handler.
+          if ((e as { name?: string })?.name === 'NotAllowedError') setAudioBlocked(true);
+        };
+        if (type === 'VIDEO') {
+          if (remoteVideoRef.current) {
+            remoteVideoRef.current.srcObject = stream;
+            remoteVideoRef.current.play().catch(handleAutoplayRejection);
+          }
+        } else if (remoteAudioRef.current) {
+          remoteAudioRef.current.srcObject = stream;
+          remoteAudioRef.current.play().catch(handleAutoplayRejection);
+        }
       }
     };
     pc.onicecandidate = (ev) => {
@@ -157,18 +183,31 @@ export default function CallScreen() {
     };
     pc.onconnectionstatechange = () => {
       if (pc.connectionState === 'connected') {
+        wasConnectedRef.current = true;
         emit('call:connection', { callId, status: 'CONNECTED' });
-      } else if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
+      } else if (pc.connectionState === 'disconnected') {
+        // ICE candidates may still recover — enter the existing RECONNECTING
+        // contract (grace period + server-enforced deadline), no new architecture.
+        if (wasConnectedRef.current && callStateRef.current === 'connected') {
+          emit('call:connection', { callId, status: 'RECONNECTING' });
+          setStatus('reconnecting');
+        }
+      } else if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
         emit('call:connection', { callId, status: 'DISCONNECTED' });
-        if (pc.connectionState === 'failed' && callStateRef.current === 'connecting') {
+        if (wasConnectedRef.current) {
+          // Give the peer the reconnect grace window; the server deadline ends
+          // the call if the connection never returns.
+          setStatus('reconnecting');
+        } else if (callStateRef.current === 'connecting') {
           setStatus('failed');
         }
       }
     };
     return pc;
-  }, [emit, setStatus]);
+  }, [emit, setStatus, type]);
 
   const initVideo = useCallback(async (callId: string, forOffer: boolean) => {
+    const turnIceServers = turnServersRef.current ? await turnServersRef.current : [];
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: true,
@@ -176,7 +215,7 @@ export default function CallScreen() {
       });
       localStreamRef.current = stream;
       if (localVideoRef.current) localVideoRef.current.srcObject = stream;
-      const pc = setupPeer(callId);
+      const pc = setupPeer(callId, turnIceServers);
       if (forOffer) {
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
@@ -185,7 +224,7 @@ export default function CallScreen() {
       }
     } catch {
       /* permission denied - proceed without local media */
-      const pc = setupPeer(callId);
+      const pc = setupPeer(callId, turnIceServers);
       if (forOffer) {
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
@@ -199,6 +238,13 @@ export default function CallScreen() {
   useEffect(() => {
     if (initializedRef.current) return;
     initializedRef.current = true;
+
+    // Request short-lived TURN credentials (server-issued Twilio NTS ICE
+    // servers, authenticated). On any failure we resolve to [] and keep the
+    // existing STUN-only path instead of blocking the call.
+    turnServersRef.current = api<{ iceServers?: RTCIceServer[] }>('/calls/turn-credentials', { auth: true })
+      .then((d) => d?.iceServers ?? [])
+      .catch(() => [] as RTCIceServer[]);
 
     if (ongoing || incoming) {
       // Receiver side: we already joined via accept overlay; join the call room
@@ -240,6 +286,17 @@ export default function CallScreen() {
       if (pcRef.current) pcRef.current.close();
       localStreamRef.current?.getTracks().forEach((t) => t.stop());
       const callId = callIdRef.current;
+      // Cleanup: never leave the server thinking we are still in a live call.
+      // Emit cancel (unanswered) or end (accepted/connected) so the call is
+      // torn down even when the user navigates away instead of pressing hang-up.
+      const st = callStateRef.current;
+      if (callId && (st === 'connecting' || st === 'connected' || st === 'reconnecting')) {
+        if (st === 'connecting' && !acceptedRef.current) {
+          emit('call:cancel', { callId });
+        } else {
+          emit('call:end', { callId, quality: 4 });
+        }
+      }
       if (callId) leaveRoom(`call:${callId}`);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -302,7 +359,15 @@ export default function CallScreen() {
       })
     );
 
-    offs.push(on('call:accepted', () => pushOffer()));
+    offs.push(on('call:accepted', () => {
+      acceptedRef.current = true;
+      pushOffer();
+    }));
+    offs.push(
+      on('call:peer_reconnecting', () => {
+        if (callStateRef.current === 'connected') setStatus('reconnecting');
+      })
+    );
     offs.push(
       on('call:rejected', () => {
         setStatus('rejected');
@@ -332,12 +397,13 @@ export default function CallScreen() {
       on('call:state', (p: { callId: string; status: string }) => {
         if (p.callId !== callIdRef.current) return;
         if (p.status === 'CONNECTED') setStatus('connected');
+        else if (p.status === 'RECONNECTING') setStatus('reconnecting');
         else if (p.status === 'ENDED') setStatus('ended');
         else if (p.status === 'REJECTED') setStatus('rejected');
         else if (p.status === 'CANCELLED') setStatus('cancelled');
         else if (p.status === 'MISSED') setStatus('missed');
         else if (p.status === 'BUSY') setStatus('busy');
-        else if (p.status === 'FAILED') setStatus('ended');
+        else if (p.status === 'FAILED') setStatus('failed');
       })
     );
     offs.push(
@@ -409,7 +475,16 @@ export default function CallScreen() {
 
   const endCall = () => {
     const callId = callIdRef.current;
-    if (callId) emit('call:end', { callId, quality: 4 });
+    if (callId) {
+      // Lifecycle correctness: hanging up before the receiver answered is a
+      // CANCEL — never recorded or billed as connected usage. After acceptance
+      // or during connection/connected it is a normal call:end.
+      if (callStateRef.current === 'connecting' && !acceptedRef.current) {
+        emit('call:cancel', { callId });
+      } else {
+        emit('call:end', { callId, quality: 4 });
+      }
+    }
     pcRef.current?.close();
     localStreamRef.current?.getTracks().forEach((t) => t.stop());
     if (callId) leaveRoom(`call:${callId}`);
@@ -440,6 +515,7 @@ export default function CallScreen() {
   const statusLabel: Record<CallState, string> = {
     connecting: 'Connecting…',
     connected: fmt(seconds),
+    reconnecting: 'Reconnecting…',
     ended: 'Call ended',
     missed: 'Missed call',
     busy: 'Busy',
@@ -465,6 +541,7 @@ export default function CallScreen() {
           </div>
         ) : (
           <div className="absolute inset-0 flex items-center justify-center">
+            <audio ref={remoteAudioRef} autoPlay playsInline className="hidden" />
             <div className="text-center">
               <Avatar src={avatarUrl} name={displayName} size="2xl" online />
               <h1 className="text-2xl font-bold mt-4">{displayName}</h1>
@@ -502,6 +579,34 @@ export default function CallScreen() {
           <div className="absolute top-4 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full bg-brand-600 text-white text-sm font-medium shadow-lg">
             {giftsToast}
           </div>
+        )}
+
+        {/* Autoplay-blocked fallback: the browser refused to start remote audio
+            on its own, so offer a user-gesture action. Never bypass the
+            browser security restriction. */}
+        {callActive && audioBlocked && (
+          <button
+            onClick={() => {
+              if (remoteAudioRef.current) {
+                remoteAudioRef.current
+                  .play()
+                  .then(() => setAudioBlocked(false))
+                  .catch(() => {});
+              }
+              if (type === 'VIDEO' && remoteVideoRef.current) {
+                remoteVideoRef.current
+                  .play()
+                  .then(() => setAudioBlocked(false))
+                  .catch(() => {});
+              }
+            }}
+            className="absolute inset-0 z-30 flex items-center justify-center bg-black/40"
+            aria-label="Unmute remote audio"
+          >
+            <span className="px-6 py-3 rounded-full bg-brand-600 text-white font-semibold text-sm shadow-xl animate-pulse">
+              Tap to hear audio
+            </span>
+          </button>
         )}
       </div>
 

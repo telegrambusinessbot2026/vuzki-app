@@ -1,6 +1,31 @@
 import { prisma } from '@vuzki/database';
 import { RestrictionType } from '@vuzki/shared';
 
+export type NormalizedGender = 'MALE' | 'FEMALE';
+
+/** Coerce any stored gender string into its canonical enum value, or null when it is not a usable MALE/FEMALE. */
+export function normalizeGender(value: string | null | undefined): NormalizedGender | null {
+  const g = (value ?? '').trim().toUpperCase();
+  if (g === 'MALE' || g === 'FEMALE') return g;
+  return null;
+}
+
+export function oppositeOf(gender: NormalizedGender): NormalizedGender {
+  return gender === 'MALE' ? 'FEMALE' : 'MALE';
+}
+
+/**
+ * HARD RULE enforced across every server-side candidate selection (Talk Now,
+ * Random Match, discovery feed, listener browser): two users may only be
+ * connected when BOTH genders are known and strictly opposite (MALE <-> FEMALE).
+ * Same-gender, missing, or non-binary gender pairs never match.
+ */
+export function isStrictlyOppositeGender(a: string | null | undefined, b: string | null | undefined): boolean {
+  const ga = normalizeGender(a);
+  const gb = normalizeGender(b);
+  return ga !== null && gb !== null && ga !== gb;
+}
+
 interface MatchWeights {
   interests: number;
   languages: number;
@@ -122,6 +147,10 @@ export async function findCandidates(params: {
     },
   });
   if (!me) return [];
+  // HARD RULE: the requester must have a known MALE/FEMALE gender, otherwise no
+  // candidates are surfaced (never create an unsafe match from a missing/invalid gender).
+  const meGender = normalizeGender(me.gender);
+  if (!meGender) return [];
 
   const myInterests = me.profile?.interests ?? [];
   const myLanguages = me.profile?.languages ?? [];
@@ -166,9 +195,11 @@ export async function findCandidates(params: {
     where.dateOfBirth = { gte: minDob, lte: maxDob, not: null };
   }
 
-  if (params.filters?.gender && params.filters.gender !== 'all') {
-    where.gender = params.filters.gender;
-  }
+  // HARD RULE: the discovery feed only surfaces the strict opposite gender.
+  // A saved genderPreference is honored only when it coincides with the opposite
+  // gender; any conflicting preference or client-side gender filter is ignored.
+  const prefGender = normalizeGender(genderPref);
+  where.gender = prefGender === oppositeOf(meGender) ? prefGender : oppositeOf(meGender);
   if (params.filters?.isCreator === true) where.isCreator = true;
   if (params.filters?.isVerifiedOnly) where.isVerified = true;
   if (params.filters?.isPremiumOnly) where.premiumTier = { not: 'FREE' };
@@ -194,7 +225,11 @@ export async function findCandidates(params: {
   const myLat = me.latitude;
   const myLng = me.longitude;
 
-  const scored = candidates
+  // Defense in depth: never surface a non-opposite-gender candidate even if the
+  // DB-side filter above was bypassed, drifted, or the pool was injected in tests.
+  const eligible = candidates.filter((c) => isStrictlyOppositeGender(me.gender, c.gender));
+
+  const scored = eligible
     .map((c) => {
       const dist =
         myLat && myLng && c.latitude && c.longitude

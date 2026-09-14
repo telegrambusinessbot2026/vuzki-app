@@ -141,7 +141,7 @@ authRoutes.post('/register', rateLimiter(15 * 60 * 1000, 5), wrap(async (req, re
 async function loginExistingUser(res: any, user: any) {
   const session = await createSession(user.id, res.req);
   const tokens = issueTokens({ userId: user.id, sessionId: session.id });
-  const full = await prisma.user.findUnique({ where: { id: user.id }, include: { wallet: true, preferences: true, subscriptions: { where: { status: 'ACTIVE' } } } });
+  const full = await prisma.user.findUnique({ where: { id: user.id }, include: { profile: true, wallet: true, preferences: true, subscriptions: { where: { status: 'ACTIVE' } } } });
   const needsOnboarding = user.onboardingStep !== OnboardingStep.COMPLETE;
   res.json({
     success: true,
@@ -191,7 +191,7 @@ authRoutes.post('/login', rateLimiter(15 * 60 * 1000, 10), wrap(async (req, res)
 
   const session = await createSession(user.id, req);
   const tokens = issueTokens({ userId: user.id, sessionId: session.id });
-  const full = await prisma.user.findUnique({ where: { id: user.id }, include: { wallet: true, preferences: true, subscriptions: { where: { status: 'ACTIVE' } } } });
+  const full = await prisma.user.findUnique({ where: { id: user.id }, include: { profile: true, wallet: true, preferences: true, subscriptions: { where: { status: 'ACTIVE' } } } });
   const needsOnboarding = user.onboardingStep !== OnboardingStep.COMPLETE;
 
   res.json({
@@ -353,7 +353,7 @@ authRoutes.post('/reset-password', rateLimiter(15 * 60 * 1000, 5), wrap(async (r
 authRoutes.get('/me', authenticate(), wrap(async (req: AuthedRequest, res) => {
   const user = await prisma.user.findUnique({
     where: { id: req.auth!.userId },
-    include: { wallet: true, preferences: true, subscriptions: { where: { status: 'ACTIVE' } } },
+    include: { profile: true, wallet: true, preferences: true, subscriptions: { where: { status: 'ACTIVE' } } },
   });
   if (!user) throw new ApiErrorResponse(404, 'USER_NOT_FOUND', 'User not found');
   res.json({ success: true, data: { user: toSelfUser(user) } });

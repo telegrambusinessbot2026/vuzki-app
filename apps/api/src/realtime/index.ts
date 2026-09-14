@@ -14,6 +14,7 @@ import {
   markBusy,
   failCall,
   initiateCall,
+  markCallConnected,
 } from '../services/calls';
 import { isBlockedPair } from '../services/ai-moderation';
 import { moderateText } from '../services/ai-moderation';
@@ -35,8 +36,24 @@ import {
   cleanupCallSession,
   otherPeer,
   isCallActive,
+  setRingingDeadline,
   CallLiveStatus,
+  isCallTerminal,
 } from './call-tracker';
+import {
+  armRingTimeout,
+  armConnectTimeout,
+  armReconnectDeadline,
+  clearCallTimers,
+} from './timers';
+import {
+  handleRingTimeout,
+  handleConnectTimeout,
+  handleReconnectTimeout,
+  RING_TIMEOUT_MS,
+  CONNECT_TIMEOUT_MS,
+  RECONNECT_DEADLINE_BUFFER_MS,
+} from './call-lifecycle';
 import {
   startMatchmaking,
   cancelMatchmaking,
@@ -44,7 +61,7 @@ import {
   resolveMatchForUser,
   subscribeMatches,
 } from './matching';
-import { MessageType, CallConnectionStatus, NotificationType } from '@vuzki/shared';
+import { MessageType, CallConnectionStatus, CallStatus, NotificationType } from '@vuzki/shared';
 import { realtimeMetrics } from './metrics';
 import { canInteract, blockUser } from '../services/privacy';
 import { isRestricted, RestrictionScope } from '../services/restrictions';
@@ -278,6 +295,13 @@ export function createRealtimeServer(httpServer: HttpServer) {
         const recvLimit = await allow('call_recipient', userId, receiverId);
         if (!recvLimit.allowed) return ack?.({ ok: false, error: 'RATE_LIMITED' });
 
+        // IN_CALL protection (presence-level): never ring someone who is already
+        // inside another WebRTC call. initiateCall adds a DB-level guard too.
+        const cbPresence = await getPresence(receiverId).catch(() => null);
+        if (cbPresence?.state === 'IN_CALL' || cbPresence?.currentCall) {
+          return ack?.({ ok: false, error: 'RECEIVER_BUSY', message: 'Receiver is currently in another call' });
+        }
+
         const { call, rate } = await initiateCall({ callerId: userId, receiverId, type });
         // Track live session
         const session = await createCallSession({ callId: call.id, type, callerId: userId, receiverId });
@@ -295,12 +319,20 @@ export function createRealtimeServer(httpServer: HttpServer) {
           await missCall(call.id).catch(() => {});
           await updateCallStatus(call.id, 'MISSED');
           await cleanupCallSession(call.id);
+          realtimeMetrics.calls.missed++;
           return ack?.({
             ok: false,
             error: 'USER_OFFLINE',
             data: { callId: call.id },
           });
         }
+
+        // Reliable server-side ring timeout: if the receiver never answers
+        // within RING_TIMEOUT_MS the call is marked MISSED, BUSY is cleared,
+        // both participants are notified and ringing stops. No call is ever
+        // left permanently RINGING.
+        await setRingingDeadline(call.id, Date.now() + RING_TIMEOUT_MS);
+        armRingTimeout(call.id, RING_TIMEOUT_MS, () => void handleRingTimeout(call.id, io));
 
         const incoming = {
           callId: call.id,
@@ -336,7 +368,6 @@ export function createRealtimeServer(httpServer: HttpServer) {
           if (session.callerId !== to && session.receiverId !== to) return;
           if (session.callerId !== userId && session.receiverId !== userId) return;
           emitToUser(io, to, 'call:signal', { from: userId, callId, event, data });
-          for (const id of getSocketIds(to)) io.to(id).emit('call:signal', { from: userId, callId, event, data });
         });
         return;
       }
@@ -347,6 +378,8 @@ export function createRealtimeServer(httpServer: HttpServer) {
       const { callId } = payload || {};
       try {
         await acceptCall(callId, userId);
+        // No longer ringing: any ring timeout must not fire now.
+        clearCallTimers(callId);
         const session = await addPeer(callId, {
           userId,
           role: 'RECEIVER',
@@ -360,8 +393,26 @@ export function createRealtimeServer(httpServer: HttpServer) {
         const accepted = { callId, by: userId, timestamp: Date.now() };
         emitToUser(io, callerId, 'call:accepted', accepted);
         io.to(`call:${callId}`).emit('call:state', { callId, status: 'ACCEPTED', by: userId });
+
+        // Receiver is now committed to the call: flip presence IN_CALL so no
+        // second incoming call can be accepted (accepted-but-never-connected is
+        // reclaimed by the connect timeout below).
+        await setCurrentCall(userId, callId).catch(() => {});
+        // If WebRTC never establishes, end the call cleanly instead of leaving
+        // an ACCEPTED/ONGOING call dangling forever (never bills).
+        armConnectTimeout(callId, CONNECT_TIMEOUT_MS, () => void handleConnectTimeout(callId, io));
+
         ack?.({ ok: true });
       } catch (e: any) {
+        // BUSY (already in another call): the receiver may already have been
+        // routed to the call page — tell it (and the caller) the call is busy.
+        if (e?.code === 'BUSY' || e?.code === 'RECEIVER_BUSY') {
+          io.to(`call:${callId ?? ''}`).emit('call:state', { callId, status: 'BUSY', by: userId });
+          emitToUser(io, userId, 'call:busy', { callId, by: userId });
+          await updateCallStatus(callId, 'BUSY').catch(() => {});
+          await cleanupCallSession(callId).catch(() => {});
+          return ack?.({ ok: false, error: 'BUSY' });
+        }
         ack?.({ ok: false, error: e?.code || 'INTERNAL' });
       }
     });
@@ -370,11 +421,14 @@ export function createRealtimeServer(httpServer: HttpServer) {
       const { callId } = payload || {};
       try {
         await rejectCall(callId, userId);
+        clearCallTimers(callId);
         const session = await getCallSession(callId);
         await updateCallStatus(callId, 'REJECTED');
         const callerId = session?.callerId ?? userId;
         emitToUser(io, callerId, 'call:rejected', { callId, by: userId });
         io.to(`call:${callId}`).emit('call:state', { callId, status: 'REJECTED', by: userId });
+        await setCurrentCall(callerId, null).catch(() => {});
+        await setCurrentCall(userId, null).catch(() => {});
         await cleanupCallSession(callId);
         ack?.({ ok: true });
       } catch {
@@ -385,12 +439,16 @@ export function createRealtimeServer(httpServer: HttpServer) {
     socket.on('call:cancel', async (payload, ack) => {
       const { callId } = payload || {};
       try {
-        await cancelCall(callId, userId);
+        const result = await cancelCall(callId, userId);
+        clearCallTimers(callId);
+        void result;
         await updateCallStatus(callId, 'CANCELLED');
         const session = await getCallSession(callId);
         const receiverId = session?.receiverId ?? userId;
         emitToUser(io, receiverId, 'call:cancelled', { callId, by: userId });
         io.to(`call:${callId}`).emit('call:state', { callId, status: 'CANCELLED', by: userId });
+        await setCurrentCall(userId, null).catch(() => {});
+        await setCurrentCall(receiverId, null).catch(() => {});
         await cleanupCallSession(callId);
         ack?.({ ok: true });
       } catch {
@@ -402,11 +460,14 @@ export function createRealtimeServer(httpServer: HttpServer) {
       const { callId } = payload || {};
       try {
         await markBusy(callId);
+        clearCallTimers(callId);
         await updateCallStatus(callId, 'BUSY');
         const session = await getCallSession(callId);
         const callerId = session?.callerId ?? userId;
         emitToUser(io, callerId, 'call:busy', { callId, by: userId });
         io.to(`call:${callId}`).emit('call:state', { callId, status: 'BUSY', by: userId });
+        await setCurrentCall(callerId, null).catch(() => {});
+        await setCurrentCall(userId, null).catch(() => {});
         await cleanupCallSession(callId);
         ack?.({ ok: true });
       } catch {
@@ -417,11 +478,14 @@ export function createRealtimeServer(httpServer: HttpServer) {
     socket.on('call:miss', async (payload) => {
       const { callId } = payload || {};
       await missCall(callId).catch(() => {});
+      clearCallTimers(callId);
       const session = await getCallSession(callId);
       await updateCallStatus(callId, 'MISSED');
       const callerId = session?.callerId ?? userId;
       emitToUser(io, callerId, 'call:missed', { callId });
       io.to(`call:${callId}`).emit('call:state', { callId, status: 'MISSED' });
+      await setCurrentCall(callerId, null).catch(() => {});
+      await setCurrentCall(userId, null).catch(() => {});
       realtimeMetrics.calls.missed++;
       await cleanupCallSession(callId);
     });
@@ -431,14 +495,37 @@ export function createRealtimeServer(httpServer: HttpServer) {
       const { callId, status } = payload || {};
       if (!callId || !status) return;
       const session = await getCallSession(callId);
-      if (!session) return;
-      const sessionAfter = await setPeerConnection(callId, userId, status);
+      if (!session || isCallTerminal(session.status)) return;
 
-      if (status === CallConnectionStatus.RECONNECTING) {
+      // Peer dropped: enter the existing RECONNECTING contract (grace period +
+      // hard deadline). If they never return, the reconnect deadline ends the
+      // call cleanly — never a permanently half-open connection.
+      if (status === CallConnectionStatus.RECONNECTING || status === CallConnectionStatus.DISCONNECTED) {
+        const sessionAfter = await setPeerConnection(callId, userId, CallConnectionStatus.RECONNECTING);
         realtimeMetrics.calls.reconnections++;
         io.to(`call:${callId}`).emit('call:state', { callId, status: 'RECONNECTING', by: userId });
         emitToUser(io, otherPeer(session, userId), 'call:peer_reconnecting', { callId, by: userId });
-      } else if (status === CallConnectionStatus.CONNECTED) {
+        if (sessionAfter?.reconnectDeadlineMs) {
+          armReconnectDeadline(
+            callId,
+            sessionAfter.reconnectDeadlineMs - Date.now() + RECONNECT_DEADLINE_BUFFER_MS,
+            () => void handleReconnectTimeout(callId, io)
+          );
+        }
+        return;
+      }
+
+      const sessionAfter = await setPeerConnection(callId, userId, status);
+
+      if (status === CallConnectionStatus.CONNECTED) {
+        // Recovered (or connected for the first time): clear every deadline.
+        clearCallTimers(callId);
+        // Persist the CONNECTED moment exactly once — billing anchors on this.
+        await markCallConnected(callId).catch(() => {});
+        // Participants are genuinely in the call now: flip IN_CALL presence on
+        // both so no new incoming call can be accepted and peers see call state.
+        await setCurrentCall(userId, callId).catch(() => {});
+        await setCurrentCall(sessionAfter ? otherPeer(sessionAfter, userId) : otherPeer(session, userId), callId).catch(() => {});
         // When both peers connected, the call is CONNECTED (billing starts)
         if (sessionAfter?.status === 'CONNECTED') {
           realtimeMetrics.calls.active++;
@@ -458,15 +545,41 @@ export function createRealtimeServer(httpServer: HttpServer) {
         if (callRow.callerId !== userId && callRow.receiverId !== userId) {
           return ack?.({ ok: false, error: 'NOT_PARTICIPANT' });
         }
+
+        // Unanswered RINGING call: hanging up is a CANCEL (caller) or MISS
+        // (receiver) — never a COMPLETED/billed call.
+        if (callRow.status === CallStatus.RINGING) {
+          const session = await getCallSession(callId);
+          if (callRow.callerId === userId) {
+            await cancelCall(callId, userId);
+            await updateCallStatus(callId, 'CANCELLED');
+            emitToUser(io, callRow.receiverId, 'call:cancelled', { callId, by: userId });
+            io.to(`call:${callId}`).emit('call:state', { callId, status: 'CANCELLED', by: userId });
+          } else {
+            await missCall(callId);
+            await updateCallStatus(callId, 'MISSED');
+            emitToUser(io, callRow.callerId, 'call:missed', { callId, by: userId });
+            io.to(`call:${callId}`).emit('call:state', { callId, status: 'MISSED', by: userId });
+            realtimeMetrics.calls.missed++;
+          }
+          clearCallTimers(callId);
+          await setCurrentCall(callRow.callerId, null).catch(() => {});
+          await setCurrentCall(callRow.receiverId, null).catch(() => {});
+          await cleanupCallSession(callId);
+          return ack?.({ ok: true });
+        }
+
         const result = await endCall(callId, { quality, endBy: userId });
         const session = await getCallSession(callId);
-        await updateCallStatus(callId, session?.status === 'CONNECTED' ? 'ENDED' : 'ENDED');
+        clearCallTimers(callId);
+        await updateCallStatus(callId, 'ENDED');
         emitToUser(io, otherPeerSafe(session, userId), 'call:ended', { callId, by: userId, ...result?.call });
         io.to(`call:${callId}`).emit('call:ended', { callId, by: userId, ...result?.call });
         io.to(`call:${callId}`).emit('call:state', { callId, status: 'ENDED', by: userId });
         await cleanupCallSession(callId);
         const p = await getPresence(userId);
         if (p?.state === 'IN_CALL' || p?.currentCall === callId) await setCurrentCall(userId, null);
+        if (session) await setCurrentCall(otherPeerSafe(session, userId), null).catch(() => {});
         ack?.({ ok: true, ...result });
       } catch (e: any) {
         ack?.({ ok: false, error: e?.code || 'INTERNAL' });
@@ -546,6 +659,7 @@ export function createRealtimeServer(httpServer: HttpServer) {
 
         // Emit call-ended to both peers.
         const result = await endCall(callId, { failReason: 'BLOCKED' }).catch(() => null);
+        clearCallTimers(callId);
         io.to(`call:${callId}`).emit('call:ended', { callId, by: userId, reason: 'BLOCKED', ...result?.call });
         io.to(`call:${callId}`).emit('call:state', { callId, status: 'ENDED', by: userId });
         await cleanupCallSession(callId);
@@ -638,12 +752,15 @@ export function createRealtimeServer(httpServer: HttpServer) {
           if (!session) continue;
           try {
             await endCall(callId, { failReason: 'DISCONNECT' });
+            clearCallTimers(callId);
             await updateCallStatus(callId, 'FAILED');
             getMetricsInstance().trackCallFailed();
             io.to(`call:${callId}`).emit('call:ended', { callId, by: userId, reason: 'DISCONNECT' });
             io.to(`call:${callId}`).emit('call:state', { callId, status: 'FAILED', by: userId });
             const peer = otherPeerSafe(session, userId);
             emitToUser(io, peer, 'call:peer_disconnected', { callId, by: userId });
+            await setCurrentCall(userId, null).catch(() => {});
+            await setCurrentCall(peer, null).catch(() => {});
             await cleanupCallSession(callId);
           } catch {
             /* best effort */

@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
+import { api, ApiError } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Input, TextArea } from '@/components/ui/Input';
 import { Chip } from '@/components/ui/Card';
@@ -13,7 +14,7 @@ const steps = ['Interests', 'About you', 'Languages', 'Preferences'];
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const { user, updateUser } = useAuth();
+  const { user, refresh } = useAuth();
 
   const [step, setStep] = useState(0);
   const [interests, setInterests] = useState<string[]>(user?.interests ?? []);
@@ -44,13 +45,33 @@ export default function OnboardingPage() {
     setStep((s) => s + 1);
   };
 
-  const finish = () => {
+  const finish = async () => {
     setError(null);
     setLoading(true);
-    if (user) {
-      updateUser({ ...user, interests, bio, displayName, languages, onboardingStep: 'complete', needsOnboarding: false });
+    try {
+      // Persist the collected onboarding data through the existing profile API.
+      // Onboarding is only marked complete AFTER the server save succeeds so a
+      // failed save never leaves the user half-onboarded or stuck in a loop.
+      await api('/users/me/profile', {
+        method: 'PUT',
+        auth: true,
+        body: {
+          displayName,
+          bio,
+          interests,
+          languages,
+          onboardingStep: 'COMPLETE',
+        },
+      });
+      // Sync local auth/user state with the server (bio, interests, languages,
+      // onboardingStep) so the completed state survives logout/login.
+      await refresh();
+      router.push('/app/home');
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not save your profile. Please try again.');
+    } finally {
+      setLoading(false);
     }
-    setTimeout(() => router.push('/app/home'), 400);
   };
 
   return (

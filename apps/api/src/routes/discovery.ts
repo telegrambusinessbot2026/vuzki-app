@@ -4,7 +4,7 @@ import { prisma } from '@vuzki/database';
 import { ApiErrorResponse } from '@vuzki/types';
 import { wrap, toPublicUser } from './helpers';
 import { authenticate, AuthedRequest } from '../middleware/auth';
-import { findCandidates } from '../services/matching';
+import { findCandidates, normalizeGender, oppositeOf } from '../services/matching';
 import { notify } from '../services/notification';
 import { isBlockedPair } from '../services/ai-moderation';
 import { WalletTransactionType, NotificationType } from '@vuzki/shared';
@@ -51,11 +51,20 @@ discoveryRoutes.get('/feed', authenticate(), wrap(async (req: AuthedRequest, res
 
 // GET /discovery/talk-now - find available people now
 discoveryRoutes.get('/talk-now', authenticate(), wrap(async (req: AuthedRequest, res) => {
+  const me = await prisma.user.findUnique({
+    where: { id: req.auth!.userId },
+    select: { id: true, gender: true },
+  });
+  if (!me) return res.json({ success: true, data: { items: [] } });
+  const meGender = normalizeGender(me.gender);
+  if (!meGender) return res.json({ success: true, data: { items: [] } });
+
   const available = await prisma.user.findMany({
     where: {
       id: { not: req.auth!.userId },
       status: 'ACTIVE',
       onboardingStep: 'COMPLETE',
+      gender: oppositeOf(meGender),
       OR: [{ creatorStatus: { in: ['AVAILABLE', 'BUSY'] } }, { onlineStatus: true }],
     },
     take: 20,

@@ -72,24 +72,21 @@ describe('Talk Now matchmaking', () => {
   });
 
   it('matches to a compatible online user and reports score', async () => {
-    mocks.userFindUnique.mockImplementation((args: any) => makeUser(args.where.id));
-    // pool of online users includes u2
-    mocks.userFindMany.mockResolvedValue([makeUser('u2')]);
+    mocks.userFindUnique.mockImplementation((args: any) => makeUser(args.where.id, args.where.id === 'u1' ? { gender: 'MALE' } : {}));
+    // pool of online users includes u2 (female, opposite of u1)
+    mocks.userFindMany.mockResolvedValue([makeUser('u2', { gender: 'FEMALE' })]);
 
     const { startMatchmaking: start2 } = await import('../realtime/matching');
-    await start2('u1', { mode: 'matched' });
+    const res = await start2('u1', { mode: 'matched' });
+    expect(res.ok).toBe(true);
 
     const entry = await getUserMatch('u1');
-    if (entry?.state === 'MATCHED') {
-      const match = await resolveMatchForUser('u1');
-      expect(match?.state).toBe('MATCHED');
-      expect(match?.matchedWith?.id).toBe('u2');
-      expect(match?.score).toBeGreaterThanOrEqual(0);
-      expect(match?.shared).toBeDefined();
-    } else {
-      // random match not guaranteed deterministic, but must not be an error state
-      expect(['WAITING', 'MATCHED', 'CANCELLED']).toContain(entry?.state);
-    }
+    expect(entry?.state).toBe('MATCHED');
+    const match = await resolveMatchForUser('u1');
+    expect(match?.state).toBe('MATCHED');
+    expect(match?.matchedWith?.id).toBe('u2');
+    expect(match?.score).toBeGreaterThanOrEqual(0);
+    expect(match?.shared).toBeDefined();
   });
 
   it('cancel transitions the entry to CANCELLED', async () => {
@@ -99,10 +96,92 @@ describe('Talk Now matchmaking', () => {
     const entry = await getUserMatch('u1');
     expect(entry?.state).toBe('CANCELLED');
   });
+});
 
-  it('treated WAITING entry expires at match:poll', async () => {
-    mocks.userFindUnique.mockResolvedValue(makeUser('u1'));
-    const res = await startMatchmaking('u1', { mode: 'random' });
-    expect(res.ok).toBe(true);
+describe('Hard gender rule (Opposite Gender matching)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.isBlockedPair.mockResolvedValue(false);
+  });
+
+  afterEach(async () => {
+    await cancelMatchmaking('u1');
+    await cancelMatchmaking('u2');
+    await kv.close();
+  });
+
+  function mockPair(me: { id: string; gender: string }, other: { id: string; gender: string }) {
+    mocks.userFindUnique.mockImplementation((args: any) => {
+      if (args.where.id === me.id) return makeUser(me.id, { gender: me.gender });
+      return makeUser(other.id, { gender: other.gender });
+    });
+    mocks.userFindMany.mockResolvedValue([makeUser(other.id, { gender: other.gender })]);
+  }
+
+  const pairs: Array<[string, string, string, string, string, 'MATCHED' | 'WAITING']> = [
+    ['male -> female allowed', 'u1', 'MALE', 'u2', 'FEMALE', 'MATCHED'],
+    ['female -> male allowed', 'u1', 'FEMALE', 'u2', 'MALE', 'MATCHED'],
+    ['male -> male rejected', 'u1', 'MALE', 'u2', 'MALE', 'WAITING'],
+    ['female -> female rejected', 'u1', 'FEMALE', 'u2', 'FEMALE', 'WAITING'],
+    ['lowercase genders are normalized', 'u1', 'male', 'u2', 'FEMALE', 'MATCHED'],
+    ['mixed-case genders are normalized', 'u1', 'Female', 'u2', 'MALE', 'MATCHED'],
+    ['unknown requester gender -> no unsafe match', 'u1', 'PREFER_NOT_TO_SAY', 'u2', 'FEMALE', 'WAITING'],
+    ['non-binary candidate -> no unsafe match', 'u1', 'MALE', 'u2', 'OTHER', 'WAITING'],
+  ];
+
+  for (const [label, reqId, reqGender, otherId, otherGender, expected] of pairs) {
+    it(`${label}`, async () => {
+      mockPair({ id: reqId, gender: reqGender }, { id: otherId, gender: otherGender });
+      const res = await startMatchmaking(reqId, { mode: 'random' });
+      expect(res.ok).toBe(true);
+      const entry = await getUserMatch(reqId);
+      expect(entry?.state).toBe(expected);
+      if (expected === 'WAITING') {
+        expect(entry?.matchedWith ?? null).toBeNull();
+      }
+    });
+  }
+
+  function mockMaleRequesterWithFemalePool(profileOverride: any = {}) {
+    mocks.userFindUnique.mockImplementation((args: any) => {
+      if (args.where.id === 'u1') {
+        return makeUser('u1', {
+          gender: 'MALE',
+          profile: { interests: [], languages: ['en'], genderPreference: 'all', ...profileOverride },
+        });
+      }
+      return makeUser('u2', { gender: 'FEMALE' });
+    });
+    mocks.userFindMany.mockResolvedValue([makeUser('u2', { gender: 'FEMALE' })]);
+  }
+
+  it('honors a specific opposite-gender preference from the request', async () => {
+    mockMaleRequesterWithFemalePool();
+
+    await startMatchmaking('u1', { mode: 'matched', preferredGender: 'female' });
+    const entry = await getUserMatch('u1');
+    expect(entry?.state).toBe('MATCHED');
+    expect(entry?.matchedWith).toBe('u2');
+  });
+
+  it('uses the saved genderPreference from the profile when no explicit preference is given', async () => {
+    mockMaleRequesterWithFemalePool({ genderPreference: 'female' });
+
+    await startMatchmaking('u1', { mode: 'matched' });
+    const entry = await getUserMatch('u1');
+    expect(entry?.state).toBe('MATCHED');
+    expect(entry?.matchedWith).toBe('u2');
+  });
+
+  it('ignores a same-gender preference and still serves the opposite gender (hard rule wins)', async () => {
+    // u1 is male but has a stored preference for male users; the hard rule
+    // cannot be satisfied by males, so the preference is ignored and u1 still
+    // receives opposite-gender candidates.
+    mockMaleRequesterWithFemalePool({ genderPreference: 'male' });
+
+    await startMatchmaking('u1', { mode: 'matched' });
+    const entry = await getUserMatch('u1');
+    expect(entry?.state).toBe('MATCHED');
+    expect(entry?.matchedWith).toBe('u2');
   });
 });

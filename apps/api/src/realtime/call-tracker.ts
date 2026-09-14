@@ -45,13 +45,20 @@ export interface CallSession {
   answeredAt?: number;
   connectedAt?: number;
   endedAt?: number;
+  ringingDeadlineMs?: number;
   peers: Record<string, PeerConnectionState>;
   reconnectDeadlineMs?: number;
 }
 
 const SESSION_KEY = (id: string) => `call:session:${id}`;
 const SESSION_TTL_MS = 6 * 60 * 60 * 1000;
-const RECONNECT_GRACE_MS = 20_000;
+export const RECONNECT_GRACE_MS = 20_000;
+
+export const TERMINAL_LIVE_STATUSES: CallLiveStatus[] = ['ENDED', 'FAILED', 'REJECTED', 'MISSED', 'CANCELLED', 'BUSY'];
+
+export function isCallTerminal(status: CallLiveStatus): boolean {
+  return TERMINAL_LIVE_STATUSES.includes(status);
+}
 
 function sessKey(callId: string) {
   return SESSION_KEY(callId);
@@ -110,7 +117,16 @@ export async function updateCallStatus(callId: string, status: CallLiveStatus): 
     s.connectedAt = now;
     for (const p of Object.values(s.peers)) p.connection = CallConnectionStatus.CONNECTED;
   }
-  if (['ENDED', 'FAILED', 'REJECTED', 'MISSED', 'CANCELLED', 'BUSY'].includes(status)) s.endedAt = now;
+  if (isCallTerminal(status)) s.endedAt = now;
+  return save(s);
+}
+
+// Record the server-side ring deadline on the session so the timeout handler
+// can check the field (and so multi-instance/pub-sub aware code can act on it).
+export async function setRingingDeadline(callId: string, deadlineMs: number): Promise<CallSession | null> {
+  const s = await getCallSession(callId);
+  if (!s) return null;
+  s.ringingDeadlineMs = deadlineMs;
   return save(s);
 }
 

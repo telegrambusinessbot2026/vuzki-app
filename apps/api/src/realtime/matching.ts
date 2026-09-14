@@ -1,7 +1,7 @@
 import { kv } from './store';
 import { prisma } from '@vuzki/database';
 import { isBlockedPair } from '../services/ai-moderation';
-import { computeCompatibility } from '../services/matching';
+import { computeCompatibility, normalizeGender, oppositeOf, isStrictlyOppositeGender } from '../services/matching';
 import { allow } from './ratelimit';
 import { getPresence } from './presence';
 
@@ -20,6 +20,7 @@ export type MatchState = 'WAITING' | 'MATCHED' | 'CONNECTING' | 'CANCELLED' | 'E
 
 export interface TalkNowEntry {
   userId: string;
+  gender?: string;
   state: MatchState;
   preferredGender?: string;
   preferredLanguage?: string;
@@ -73,6 +74,7 @@ export async function startMatchmaking(
   const entry: TalkNowEntry = {
     userId,
     state: 'WAITING',
+    gender: normalizeGender(user.gender) ?? undefined,
     preferredGender: opts.preferredGender ?? user.profile?.genderPreference ?? 'all',
     preferredLanguage: opts.preferredLanguage,
     interests: opts.interests ?? user.profile?.interests ?? [],
@@ -100,6 +102,13 @@ interface ScoredCandidate {
 }
 
 async function findCompatibleCandidate(entry: TalkNowEntry): Promise<ScoredCandidate | null> {
+  const meGender = normalizeGender(entry.gender);
+  // A saved/requested gender preference is only honored when it targets the
+  // opposite gender; otherwise the hard rule is the floor and preference is ignored.
+  const targetGender = meGender && normalizeGender(entry.preferredGender ?? '') === oppositeOf(meGender)
+    ? oppositeOf(meGender)
+    : null;
+
   const queued = await kv.list(QUEUE_KEY);
   const candidateIds: string[] = [];
   for (const uid of queued) {
@@ -111,7 +120,13 @@ async function findCompatibleCandidate(entry: TalkNowEntry): Promise<ScoredCandi
 
   // Fresh pool of online users not necessarily queued for a better match pool.
   const onlineUsers = await prisma.user.findMany({
-    where: { onlineStatus: true, status: 'ACTIVE', deletedAt: null, id: { not: entry.userId } },
+    where: {
+      onlineStatus: true,
+      status: 'ACTIVE',
+      deletedAt: null,
+      id: { not: entry.userId },
+      ...(meGender ? { gender: oppositeOf(meGender) } : {}),
+    },
     include: { profile: true },
     take: 50,
   });
@@ -123,9 +138,10 @@ async function findCompatibleCandidate(entry: TalkNowEntry): Promise<ScoredCandi
     const other = onlineUsers.find((u) => u.id === uid) ??
       (await prisma.user.findUnique({ where: { id: uid }, include: { profile: true } }));
     if (!other || other.status !== 'ACTIVE' || other.deletedAt) continue;
-    if (entry.preferredGender && entry.preferredGender !== 'all' && other.gender && other.gender !== entry.preferredGender) {
-      continue;
-    }
+    // HARD RULE: only a strictly opposite gender candidate may match.
+    if (!isStrictlyOppositeGender(entry.gender, other.gender)) continue;
+    const candidateGender = normalizeGender(other.gender);
+    if (targetGender && candidateGender !== targetGender) continue;
     if (entry.preferredLanguage && other.profile && !other.profile.languages.includes(entry.preferredLanguage)) {
       continue;
     }
@@ -154,6 +170,12 @@ async function finalizeMatch(a: TalkNowEntry, candidate: ScoredCandidate): Promi
   const otherUserId = candidate.uid;
   const me = await prisma.user.findUnique({ where: { id: a.userId }, include: { profile: true } });
   const other = await prisma.user.findUnique({ where: { id: otherUserId }, include: { profile: true } });
+
+  // Defense in depth: never finalize a same-gender / ambiguous pair, even if the
+  // candidate pool changed between candidate selection and finalization.
+  if (!isStrictlyOppositeGender(me?.gender, other?.gender)) {
+    return parse(await kv.get(ENTRY_KEY(a.userId)));
+  }
 
   const sharedFor = (self: any, peer: any) =>
     (self?.profile?.interests ?? []).filter((i: string) => (peer?.profile?.interests ?? []).includes(i));
@@ -249,18 +271,22 @@ export async function resolveMatchForUser(
 export async function getAvailableListeners(userId: string, limit = 20) {
   const me = await prisma.user.findUnique({ where: { id: userId }, include: { blocksMade: true, blocksReceived: true, profile: true } });
   if (!me) return [];
+  // HARD RULE: the requester needs a known gender before any listeners are listed.
+  const meGender = normalizeGender(me.gender);
+  if (!meGender) return [];
   const blocked = new Set([
     ...(me.blocksMade ?? []).map((b) => b.blockedId),
     ...(me.blocksReceived ?? []).map((b) => b.blockerId),
     userId,
   ]);
   const online = await prisma.user.findMany({
-    where: { onlineStatus: true, status: 'ACTIVE', deletedAt: null, id: { notIn: [...blocked] } },
+    where: { onlineStatus: true, status: 'ACTIVE', deletedAt: null, gender: oppositeOf(meGender), id: { notIn: [...blocked] } },
     include: { profile: true },
     take: 100,
   });
   const out = [];
   for (const u of online) {
+    if (!isStrictlyOppositeGender(me.gender, u.gender)) continue;
     const { score, factors } = computeCompatibility(
       { interests: me?.profile?.interests ?? [], languages: me?.profile?.languages ?? [] },
       { interests: u.profile?.interests ?? [], languages: u.profile?.languages ?? [], isOnline: true, isVerified: u.isVerified, isPremium: u.premiumTier !== 'FREE' }

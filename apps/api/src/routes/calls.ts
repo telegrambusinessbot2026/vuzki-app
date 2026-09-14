@@ -5,6 +5,7 @@ import { ApiErrorResponse } from '@vuzki/types';
 import { wrap } from './helpers';
 import { authenticate, AuthedRequest } from '../middleware/auth';
 import { initiateCall, endCall, buildRtcConnection, calculateCallCost } from '../services/calls';
+import { getTurnCredentialIceServers } from '../services/turn';
 import { notify } from '../services/notification';
 import { CallType, NotificationType } from '@vuzki/shared';
 import { toPublicUser } from './helpers';
@@ -17,6 +18,14 @@ import {
 } from '../realtime/matching';
 
 export const callRoutes = Router();
+
+// GET /calls/turn-credentials - short-lived Twilio NTS STUN/TURN ICE servers.
+// Requires a normal authenticated user. Permanent Twilio credentials are never
+// exposed: only the temporary ICE server configuration is returned.
+callRoutes.get('/turn-credentials', authenticate(), wrap(async (_req: AuthedRequest, res) => {
+  const creds = await getTurnCredentialIceServers();
+  res.json({ success: true, data: { iceServers: creds.iceServers } });
+}));
 
 // ============ TALK NOW (matchmaking) ============
 

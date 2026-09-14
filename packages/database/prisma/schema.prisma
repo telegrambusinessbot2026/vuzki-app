@@ -362,6 +362,7 @@ model Call {
   status           String   @default("RINGING") // CallStatus
   startedAt        DateTime?
   answeredAt       DateTime?
+  connectedAt      DateTime?
   endedAt          DateTime?
   durationSeconds  Int      @default(0)
   costCoins        Int      @default(0)

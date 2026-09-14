@@ -91,6 +91,7 @@ userRoutes.get('/me/profile', authenticate(), wrap(async (req: AuthedRequest, re
   const user = await prisma.user.findUnique({
     where: { id: req.auth!.userId },
     include: {
+      profile: true,
       wallet: true,
       preferences: true,
       creator: true,
@@ -120,13 +121,13 @@ userRoutes.get('/me/profile', authenticate(), wrap(async (req: AuthedRequest, re
 const updateProfileSchema = z.object({
   displayName: z.string().min(1).max(40).optional(),
   username: z.string().regex(/^[a-zA-Z0-9_.]{3,20}$/).optional(),
-  bio: z.string().max(300).optional(),
+  bio: z.string().max(300).nullable().optional(),
   gender: z.enum(['MALE', 'FEMALE', 'OTHER', 'PREFER_NOT_TO_SAY']).optional(),
   dateOfBirth: z.string().datetime().optional(),
-  countryCode: z.string().max(3).optional(),
-  region: z.string().max(100).optional(),
-  avatarUrl: z.string().url().optional(),
-  bannerUrl: z.string().url().optional(),
+  countryCode: z.string().max(3).nullable().optional(),
+  region: z.string().max(100).nullable().optional(),
+  avatarUrl: z.string().url().nullable().optional(),
+  bannerUrl: z.string().url().nullable().optional(),
   interests: z.array(z.string()).max(20).optional(),
   languages: z.array(z.string()).max(10).optional(),
   onboardingStep: z.enum(['NONE', 'INTERESTS', 'LANGUAGES', 'PROFILE', 'COMPLETE']).optional(),
@@ -224,7 +225,7 @@ userRoutes.put('/me/profile', authenticate(), wrap(async (req: AuthedRequest, re
 
   const full = await prisma.user.findUnique({
     where: { id: userId },
-    include: { wallet: true, preferences: true, subscriptions: { where: { status: 'ACTIVE' } } },
+    include: { profile: true, wallet: true, preferences: true, subscriptions: { where: { status: 'ACTIVE' } } },
   });
   res.json({ success: true, data: { user: toSelfUser(full), onboardingStep: full!.onboardingStep } });
 }));

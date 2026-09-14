@@ -12,10 +12,13 @@ import {
   addPeer,
   setPeerConnection,
   updateCallStatus,
+  setRingingDeadline,
   endCallSession,
   cleanupCallSession,
   otherPeer,
   isCallActive,
+  isCallTerminal,
+  RECONNECT_GRACE_MS,
 } from '../realtime/call-tracker';
 import { CallType, CallConnectionStatus } from '@vuzki/shared';
 import { computeCallBilling, getCallRate, getCreatorShare } from '../services/calls';
@@ -79,6 +82,37 @@ describe('call-tracker state machine', () => {
     const s = await createCallSession({ callId: 'call-a', type: CallType.AUDIO, callerId: 'u1', receiverId: 'u2' });
     expect(otherPeer(s, 'u1')).toBe('u2');
     expect(otherPeer(s, 'u2')).toBe('u1');
+  });
+
+  it('records a server-side ring deadline so RINGING calls always time out', async () => {
+    await createCallSession({ callId: 'call-a', type: CallType.AUDIO, callerId: 'u1', receiverId: 'u2' });
+    const deadline = Date.now() + 35_000;
+    const s = await setRingingDeadline('call-a', deadline);
+    expect(s?.ringingDeadlineMs).toBe(deadline);
+  });
+
+  it('reconnect deadline is the reconnect grace period ahead of now', async () => {
+    await createCallSession({ callId: 'call-a', type: CallType.AUDIO, callerId: 'u1', receiverId: 'u2' });
+    await addPeer('call-a', { userId: 'u2', role: 'RECEIVER', connection: CallConnectionStatus.CONNECTED, joinedAt: Date.now(), lastActiveAt: Date.now() });
+    await updateCallStatus('call-a', 'CONNECTED');
+
+    const s = await setPeerConnection('call-a', 'u2', CallConnectionStatus.RECONNECTING);
+    expect(s?.status).toBe('RECONNECTING');
+    expect(s?.reconnectDeadlineMs).toBeDefined();
+    expect(s!.reconnectDeadlineMs! - Date.now()).toBeGreaterThan(0);
+    expect(s!.reconnectDeadlineMs! - Date.now()).toBeLessThanOrEqual(RECONNECT_GRACE_MS);
+  });
+
+  it('exposes terminal-status helpers used for timeout cleanup', async () => {
+    expect(isCallTerminal('RINGING')).toBe(false);
+    expect(isCallTerminal('CONNECTED')).toBe(false);
+    expect(isCallTerminal('RECONNECTING')).toBe(false);
+    expect(isCallTerminal('MISSED')).toBe(true);
+    expect(isCallTerminal('CANCELLED')).toBe(true);
+    expect(isCallTerminal('REJECTED')).toBe(true);
+    expect(isCallTerminal('ENDED')).toBe(true);
+    expect(isCallTerminal('FAILED')).toBe(true);
+    expect(isCallTerminal('BUSY')).toBe(true);
   });
 });
 

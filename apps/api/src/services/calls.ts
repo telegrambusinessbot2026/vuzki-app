@@ -10,6 +10,9 @@ import {
   VIDEO_CALL_CREATOR_SHARE,
 } from '@vuzki/shared';
 
+// A user can only ever be part of one live (non-terminal) call at a time.
+const ACTIVE_CALL_STATUSES = [CallStatus.RINGING, CallStatus.ONGOING, CallStatus.BUSY];
+
 export function getCallRate(type: CallType): number {
   return type === CallType.VIDEO ? CALL_COINS_PER_MINUTE_VIDEO : CALL_COINS_PER_MINUTE_AUDIO;
 }
@@ -38,6 +41,21 @@ export async function initiateCall(params: { callerId: string; receiverId: strin
     (await prisma.block.count({ where: { blockerId: params.callerId, blockedId: params.receiverId } })) > 0;
   if (blocked) {
     throw new ApiErrorResponse(403, 'BLOCKED', 'You cannot call this user');
+  }
+
+  // IN_CALL protection (DB-level): never ring a receiver who is already in a
+  // live call (RINGING/ONGOING/BUSY) as caller OR receiver. The realtime layer
+  // adds a presence check on top; this keeps the invariant even if presence
+  // lags. Preserves the existing creator-BUSY behaviour (receiver stays BUSY
+  // until their call actually ends).
+  const activeCount = await prisma.call.count({
+    where: {
+      status: { in: ACTIVE_CALL_STATUSES },
+      OR: [{ callerId: params.receiverId }, { receiverId: params.receiverId }],
+    },
+  });
+  if (activeCount > 0) {
+    throw new ApiErrorResponse(409, 'RECEIVER_BUSY', 'Receiver is currently in another call');
   }
 
   const rate = getCallRate(params.type);
@@ -80,19 +98,48 @@ export async function acceptCall(callId: string, userId: string) {
   if (!call) throw new ApiErrorResponse(404, 'CALL_NOT_FOUND', 'Call not found');
   if (call.receiverId !== userId) throw new ApiErrorResponse(403, 'FORBIDDEN', 'Not your call to accept');
 
-  const updated = await prisma.call.update({
-    where: { id: callId },
-    data: { status: CallStatus.ONGOING, answeredAt: new Date(), startedAt: new Date() },
+  return prisma.$transaction(async (tx) => {
+    // IN_CALL protection: a receiver who is already inside another live call
+    // (including a second RINGING call from another caller) cannot accept this
+    // one. Checked inside the transaction so two concurrent accepts can never
+    // both pass.
+    const otherActive = await tx.call.count({
+      where: {
+        id: { not: callId },
+        status: { in: ACTIVE_CALL_STATUSES },
+        OR: [{ callerId: userId }, { receiverId: userId }],
+      },
+    });
+    if (otherActive > 0) {
+      throw new ApiErrorResponse(409, 'BUSY', 'You are already in another call');
+    }
+
+    // Atomic claim: only a RINGING call may become ONGOING. A concurrent
+    // accept/cancel/miss/reject races on this single UPDATE — losing callers
+    // affect 0 rows and keep the terminal status already committed by the peer.
+    const claimed = await tx.call.updateMany({
+      where: { id: callId, status: CallStatus.RINGING },
+      data: { status: CallStatus.ONGOING, answeredAt: new Date(), startedAt: new Date() },
+    });
+    if (claimed.count === 0) {
+      // Idempotent replay (double accept click) or already terminal — return the
+      // existing row unchanged, never failing an already-accepted call.
+      return { ...call, alreadyCompleted: true };
+    }
+
+    await tx.callParticipant.upsert({
+      where: { callId_userId: { callId: call.id, userId } },
+      update: {},
+      create: { callId: call.id, userId, role: CallRole.RECEIVER },
+    });
+
+    // Mark receiver busy during the call (preserves the existing creator-BUSY rule).
+    await tx.user
+      .update({ where: { id: userId }, data: { creatorStatus: 'BUSY' } })
+      .catch(() => {});
+
+    return { ...call, status: CallStatus.ONGOING, answeredAt: new Date(), startedAt: new Date() };
   });
-
-  await prisma.callParticipant.create({
-    data: { callId: call.id, userId, role: CallRole.RECEIVER },
-  });
-
-  // Mark receiver busy during call
-  await prisma.user.update({ where: { id: userId }, data: { creatorStatus: 'BUSY' } });
-
-  return updated;
 }
 
 export async function rejectCall(callId: string, userId: string) {
@@ -111,23 +158,45 @@ export async function cancelCall(callId: string, userId: string) {
   const call = await prisma.call.findUnique({ where: { id: callId } });
   if (!call) throw new ApiErrorResponse(404, 'CALL_NOT_FOUND', 'Call not found');
   if (call.callerId !== userId) throw new ApiErrorResponse(403, 'FORBIDDEN', 'Not your call');
-  const updated = await prisma.call.update({
-    where: { id: callId },
+
+  // Only an unanswered RINGING call can be cancelled, and only once. Duplicate
+  // cancels (e.g. caller button + unmount cleanup) race on this UPDATE and the
+  // loser hits 0 rows -> alreadyCompleted no-op, so an accepted/answered call
+  // can never be cancelled out from under the participants.
+  const updated = await prisma.call.updateMany({
+    where: { id: callId, status: CallStatus.RINGING },
     data: { status: CallStatus.CANCELLED, endedAt: new Date() },
   });
+  if (updated.count === 0) {
+    return { ...call, alreadyCompleted: true };
+  }
   await resetCreatorStatus(call.receiverId);
-  return updated;
+  return { ...call, status: CallStatus.CANCELLED, endedAt: new Date() };
 }
 
 export async function missCall(callId: string) {
   const call = await prisma.call.findUnique({ where: { id: callId } });
   if (!call) return null;
-  const updated = await prisma.call.update({
-    where: { id: callId },
+  // Only a still-RINGING call can become MISSED; a call that was meanwhile
+  // accepted/ended is left untouched (idempotent under concurrent timeouts).
+  const updated = await prisma.call.updateMany({
+    where: { id: callId, status: CallStatus.RINGING },
     data: { status: CallStatus.MISSED, endedAt: new Date() },
   });
+  if (updated.count === 0) {
+    return { ...call, alreadyCompleted: true };
+  }
   await resetCreatorStatus(call.receiverId);
-  return updated;
+  return { ...call, status: CallStatus.MISSED, endedAt: new Date() };
+}
+
+// Persist the exact moment both peers established WebRTC (first CONNECTED only).
+// Billing in endCall starts from this timestamp — never from ACCEPTED/RINGING.
+export async function markCallConnected(callId: string) {
+  return prisma.call.updateMany({
+    where: { id: callId, status: CallStatus.ONGOING, connectedAt: null },
+    data: { connectedAt: new Date() },
+  });
 }
 
 // End call: compute duration, deduct caller coins, credit creator earnings. All server-side.
@@ -136,12 +205,19 @@ export async function missCall(callId: string) {
 // a losing race affects 0 rows and returns `alreadyCompleted` without billing.
 // The wallet debit also carries an idempotencyKey so the DB rejects any replay.
 // `endBy` records which participant ended the call (for history/audit).
+//
+// BILLING SAFETY: duration is measured from `connectedAt` — the exact moment
+// both peers established the WebRTC connection — NOT from startedAt/answeredAt
+// (accept time) or createdAt (ring time). A call that was accepted but never
+// actually connected (or that ended while still RINGING) has no connectedAt and
+// bills 0 seconds: no debit, no creator earning. Prices and wallet rates are
+// unchanged; only the lifecycle anchor moved to CONNECTED.
 export async function endCall(callId: string, opts?: { quality?: string; failReason?: string; endBy?: string }) {
   const call = await prisma.call.findUnique({ where: { id: callId } });
   if (!call) throw new ApiErrorResponse(404, 'CALL_NOT_FOUND', 'Call not found');
 
-  const startedAt = call.startedAt || call.answeredAt || call.createdAt;
-  const durationSeconds = Math.max(0, Math.floor((Date.now() - startedAt.getTime()) / 1000));
+  const billableStart = call.connectedAt ? call.connectedAt.getTime() : 0;
+  const durationSeconds = billableStart ? Math.max(0, Math.floor((Date.now() - billableStart) / 1000)) : 0;
   const billing = computeCallBilling(call.type as CallType, durationSeconds);
   const status = opts?.failReason ? CallStatus.FAILED : CallStatus.COMPLETED;
 
@@ -267,23 +343,27 @@ export async function getCall(callId: string) {
 }
 
 export async function markBusy(callId: string) {
-  const updated = await prisma.call.update({
-    where: { id: callId },
+  const call = await prisma.call.findUnique({ where: { id: callId } });
+  if (!call) return null;
+  const updated = await prisma.call.updateMany({
+    where: { id: callId, status: CallStatus.RINGING },
     data: { status: CallStatus.BUSY, endedAt: new Date() },
   });
-  await resetCreatorStatusLoose(updated.receiverId);
-  return updated;
+  if (updated.count === 0) return { ...call, alreadyCompleted: true };
+  await resetCreatorStatusLoose(call.receiverId);
+  return { ...call, status: CallStatus.BUSY, endedAt: new Date() };
 }
 
 export async function failCall(callId: string) {
   const call = await prisma.call.findUnique({ where: { id: callId } });
   if (!call) return null;
-  const updated = await prisma.call.update({
-    where: { id: callId },
+  const updated = await prisma.call.updateMany({
+    where: { id: callId, status: { in: ACTIVE_CALL_STATUSES } },
     data: { status: CallStatus.FAILED, endedAt: new Date() },
   });
+  if (updated.count === 0) return { ...call, alreadyCompleted: true };
   await resetCreatorStatusLoose(call.receiverId);
-  return updated;
+  return { ...call, status: CallStatus.FAILED, endedAt: new Date() };
 }
 
 async function resetCreatorStatusLoose(userId: string) {
