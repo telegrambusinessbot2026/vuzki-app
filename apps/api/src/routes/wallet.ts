@@ -48,7 +48,14 @@ walletRoutes.post('/verify', authenticate(), wrap(async (req: AuthedRequest, res
     demo: z.boolean().optional(),
   }).parse(req.body);
 
-  const result = await verifyPaymentClient({ orderId, provider, paymentId, signature, demo });
+  const result = await verifyPaymentClient({
+    userId: req.auth!.userId,
+    orderId,
+    provider,
+    paymentId,
+    signature,
+    demo,
+  });
   res.json({ success: true, data: result });
 }));
 

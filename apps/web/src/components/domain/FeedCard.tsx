@@ -27,12 +27,16 @@ export function FeedCard({ user }: { user: MockUser }) {
             <p className="text-[11px] text-white/80">{user.city}{user.distance ? ` · ${user.distance} away` : ''}</p>
           </div>
           <div className="flex gap-2">
-            <button className="h-9 w-9 rounded-full glass text-white flex items-center justify-center active:scale-90 transition-transform" aria-label="Call">
-              <PhoneIcon size={16} />
-            </button>
-            <button className="h-9 w-9 rounded-full glass text-white flex items-center justify-center active:scale-90 transition-transform" aria-label="Video call">
-              <VideoIcon size={16} />
-            </button>
+            <Link href={`/app/call/${user.id}?type=audio&name=${encodeURIComponent(user.displayName)}`} aria-label={`Audio call with ${user.displayName}`}>
+              <span className="flex h-9 w-9 items-center justify-center rounded-full glass text-white transition-transform active:scale-90" role="presentation">
+                <PhoneIcon size={16} />
+              </span>
+            </Link>
+            <Link href={`/app/call/${user.id}?type=video&name=${encodeURIComponent(user.displayName)}`} aria-label={`Video call with ${user.displayName}`}>
+              <span className="flex h-9 w-9 items-center justify-center rounded-full glass text-white transition-transform active:scale-90" role="presentation">
+                <VideoIcon size={16} />
+              </span>
+            </Link>
           </div>
         </div>
       </div>

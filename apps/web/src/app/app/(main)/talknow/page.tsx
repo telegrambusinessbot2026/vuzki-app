@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRealtime } from '@/lib/realtime-context';
+import { useAuth } from '@/lib/auth-context';
 import { api, post } from '@/lib/api';
 import { Avatar, VerifiedIcon } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
@@ -44,6 +45,7 @@ type Phase = 'idle' | 'searching' | 'matched' | 'no_match';
 
 export default function TalkNowPage() {
   const { connected, emit, on } = useRealtime();
+  const { user: me } = useAuth();
   const [phase, setPhase] = useState<Phase>('idle');
   const [match, setMatch] = useState<MatchData | null>(null);
   const [listeners, setListeners] = useState<Listener[]>([]);
@@ -158,15 +160,54 @@ export default function TalkNowPage() {
             <PhoneIcon size={40} className="text-white" />
           </div>
           <h2 className="text-2xl font-bold">Ready to talk?</h2>
-          <p className="text-white/50 text-sm mt-2 mb-2 max-w-xs">
-            We&apos;ll match you with someone who shares your vibe in seconds.
-          </p>
-          <Button variant="gradient" size="lg" full className="max-w-xs mt-4" onClick={() => beginSearch('matched')}>
-            Talk Now
-          </Button>
-          <Button variant="secondary" size="md" full className="max-w-xs mt-3" onClick={() => beginSearch('random')}>
-            Random match
-          </Button>
+
+          {/* Female: she picks how the call starts. */}
+          {me?.gender === 'FEMALE' && (
+            <>
+              <p className="text-white/50 text-sm mt-2 mb-2 max-w-xs">
+                You&apos;re in charge — pick how you&apos;d like to start the conversation.
+              </p>
+              <Button variant="gradient" size="lg" full className="max-w-xs mt-4" icon={<PhoneIcon size={18} />} onClick={() => beginSearch('matched')}>
+                Audio Call
+              </Button>
+              <Button variant="secondary" size="lg" full className="max-w-xs mt-3" icon={<VideoIcon size={18} />} onClick={() => beginSearch('random')}>
+                Video Call
+              </Button>
+              <Link href="/app/chat" className="w-full max-w-xs">
+                <Button variant="ghost" size="md" full icon={<ChatIcon size={18} />}>Keep chatting</Button>
+              </Link>
+            </>
+          )}
+
+          {/* Male: he gets the waiting note; the other person chooses the mode. */}
+          {me?.gender === 'MALE' && (
+            <>
+              <p className="text-white/50 text-sm mt-2 mb-2 max-w-xs">
+                You&apos;ll be matched with someone soon. The other person will choose whether it starts as audio or video.
+              </p>
+              <Button variant="gradient" size="lg" full className="max-w-xs mt-4" icon={<PhoneIcon size={18} />} onClick={() => beginSearch('matched')}>
+                Talk Now
+              </Button>
+              <Link href="/app/chat" className="w-full max-w-xs">
+                <Button variant="ghost" size="md" full icon={<ChatIcon size={18} />}>Keep chatting</Button>
+              </Link>
+            </>
+          )}
+
+          {/* Unknown/other gender: original behavior. */}
+          {!me?.gender || (me?.gender !== 'FEMALE' && me?.gender !== 'MALE') ? (
+            <>
+              <p className="text-white/50 text-sm mt-2 mb-2 max-w-xs">
+                We&apos;ll match you with someone who shares your vibe in seconds.
+              </p>
+              <Button variant="gradient" size="lg" full className="max-w-xs mt-4" onClick={() => beginSearch('matched')}>
+                Talk Now
+              </Button>
+              <Button variant="secondary" size="md" full className="max-w-xs mt-3" onClick={() => beginSearch('random')}>
+                Random match
+              </Button>
+            </>
+          ) : null}
         </div>
       )}
 

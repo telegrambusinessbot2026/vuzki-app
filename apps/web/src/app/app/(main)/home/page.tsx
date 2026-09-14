@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
-import { api } from '@/lib/api';
+import { api, mediaUrl } from '@/lib/api';
 import { mapFeed } from '@/lib/api-users';
 import type { FeedUser, PublicUser } from '@/lib/api-users';
 import { Avatar, CreatorBadge, PremiumBadge, VerifiedIcon } from '@/components/ui/Avatar';
@@ -95,12 +95,21 @@ export default function HomePage() {
             <p className="text-white/70 text-xs mt-1">{featured.length} creators matched to you</p>
           </div>
           <div className="flex -space-x-3">
-            {featured.slice(0, 3).map((u) => (
+            {featured.slice(0, 3).map((u) => {
+              const src = mediaUrl(u.avatarUrl);
+              return (
               <div key={u.id} className="h-12 w-12 rounded-full border-2 border-surface bg-surface-overlay overflow-hidden">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={u.avatarUrl!} alt={u.displayName} className="w-full h-full object-cover" />
+                {src ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img src={src} alt={u.displayName} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center font-bold text-brand-300 text-base bg-gradient-to-br from-surface-overlay to-surface-raised">
+                    {(u.displayName || '?').charAt(0).toUpperCase()}
+                  </div>
+                )}
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>
@@ -173,9 +182,18 @@ function StoriesRow({ stories }: { stories: { user: FeedUser; viewed: boolean }[
         <Link key={s.user.id} href={`/app/profile/${s.user.id}`} className="shrink-0 flex flex-col items-center gap-1">
           <div className={`h-16 w-16 rounded-full p-[2px] ${s.viewed ? 'bg-surface-border' : 'bg-gradient-to-tr from-brand-500 to-pink-500'}`}>
             <div className="h-full w-full rounded-full bg-surface p-0.5">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={s.user.avatarUrl!} alt={s.user.displayName} className="w-full h-full rounded-full object-cover" />
-            </div>
+                {(() => {
+                  const src = mediaUrl(s.user.avatarUrl);
+                  return src ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img src={src} alt={s.user.displayName} className="w-full h-full rounded-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full rounded-full flex items-center justify-center font-bold text-brand-300 text-lg bg-gradient-to-br from-surface-overlay to-surface-raised">
+                      {(s.user.displayName || '?').charAt(0).toUpperCase()}
+                    </div>
+                  );
+                })()}
+              </div>
           </div>
           <span className="text-[10px] text-white/70">{s.user.displayName.split(' ')[0]}</span>
         </Link>

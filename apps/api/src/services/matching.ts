@@ -1,7 +1,12 @@
 import { prisma } from '@vuzki/database';
 import { RestrictionType } from '@vuzki/shared';
+import { getUsersPresence } from '../realtime/presence';
 
 export type NormalizedGender = 'MALE' | 'FEMALE';
+
+// Call rows with a non-terminal status: a participant in any of these states
+// must never be surfaced as an available candidate (no busy/stale matches).
+const ACTIVE_CALL_STATUSES = ['RINGING', 'ONGOING'];
 
 /** Coerce any stored gender string into its canonical enum value, or null when it is not a usable MALE/FEMALE. */
 export function normalizeGender(value: string | null | undefined): NormalizedGender | null {
@@ -129,6 +134,53 @@ export interface DiscoveryCandidate {
   factors: CompatibilityFactors;
 }
 
+/**
+ * Determine which of the given userIds must be excluded from candidate
+ * selection. Two signals are checked:
+ *  1. Presence state (IN_CALL / BUSY) from the realtime KV layer.
+ *  2. A non-terminal Call row in the database (ringing/ongoing).
+ * With `requirePresenceOnline: true` (live contexts such as Talk Now) a user
+ * with an explicit OFFLINE presence snapshot, or no live presence proof at all,
+ * is also excluded so a caller can never be matched with someone who is
+ * unavailable, mid-call, or no longer connected. The discovery feed keeps this
+ * off so casual browsing still surfaces nearby users who are just not online
+ * right now.
+ */
+export async function findUnavailableUserIds(
+  userIds: string[],
+  opts: { requirePresenceOnline?: boolean } = {}
+): Promise<Set<string>> {
+  const { requirePresenceOnline = false } = opts;
+  const set = new Set<string>();
+  if (!userIds.length) return set;
+
+  const presence = await getUsersPresence(userIds);
+  for (const id of userIds) {
+    const p = presence[id];
+    if (!p) continue;
+    if (p.state === 'IN_CALL' || p.state === 'BUSY') set.add(id);
+    if (requirePresenceOnline && p.state === 'OFFLINE') set.add(id);
+  }
+
+  // DB Call rows are the second availability signal; when no call model is
+  // available (e.g. unit-test fakes), the presence-only signal still applies.
+  const activeCalls = prisma.call?.findMany
+    ? await prisma.call.findMany({
+        where: {
+          status: { in: ACTIVE_CALL_STATUSES },
+          OR: [{ callerId: { in: userIds } }, { receiverId: { in: userIds } }],
+        },
+        select: { callerId: true, receiverId: true },
+      })
+    : [];
+  for (const c of activeCalls) {
+    set.add(c.callerId);
+    set.add(c.receiverId);
+  }
+
+  return set;
+}
+
 export async function findCandidates(params: {
   userId: string;
   limit?: number;
@@ -229,7 +281,12 @@ export async function findCandidates(params: {
   // DB-side filter above was bypassed, drifted, or the pool was injected in tests.
   const eligible = candidates.filter((c) => isStrictlyOppositeGender(me.gender, c.gender));
 
-  const scored = eligible
+  // Exclude anyone busy/in-call/stale (presence + DB call rows) so the feed
+  // never offers an unavailable candidate.
+  const busyIds = await findUnavailableUserIds(eligible.map((c) => c.id));
+  const pool = eligible.filter((c) => !busyIds.has(c.id));
+
+  const scored = pool
     .map((c) => {
       const dist =
         myLat && myLng && c.latitude && c.longitude
@@ -252,7 +309,7 @@ export async function findCandidates(params: {
         dist
       );
     })
-    .map((r, idx) => ({ result: r, candidate: candidates[idx] }));
+    .map((r, idx) => ({ result: r, candidate: pool[idx] }));
 
   scored.sort((a, b) => b.result.score - a.result.score);
 

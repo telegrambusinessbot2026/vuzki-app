@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { api } from '@/lib/api';
+import { api, mediaUrl } from '@/lib/api';
 import { mapUser } from '@/lib/api-users';
 import type { FeedUser, PublicUser } from '@/lib/api-users';
 import { Chip } from '@/components/ui/Card';
@@ -24,8 +24,17 @@ export default function SearchPage() {
     setError('');
     const t = setTimeout(async () => {
       const q = query.trim();
+      // Server-driven filters: "New" is computed server-side from createdAt
+      // (accounts registered in the last 7 days) instead of the old fabricated
+      // client-side badge, so the filter reflects real data.
+      const params = new URLSearchParams();
+      if (q) params.set('q', q);
+      params.set('limit', '50');
+      if (filter === 'Online') params.set('isOnline', 'true');
+      if (filter === 'Creators') params.set('isCreator', 'true');
+      if (filter === 'New') params.set('isNew', 'true');
       try {
-        const data = await api<{ items: PublicUser[] }>(`/search?q=${encodeURIComponent(q)}&limit=50`, { auth: true });
+        const data = await api<{ items: PublicUser[] }>(`/search?${params.toString()}`, { auth: true });
         if (reqId.current === id) setResults((data.items ?? []).map((u) => mapUser(u)));
       } catch (e: any) {
         if (reqId.current === id) setError(e?.message || 'Search failed');
@@ -34,7 +43,7 @@ export default function SearchPage() {
       }
     }, 300);
     return () => clearTimeout(t);
-  }, [query]);
+  }, [query, filter]);
 
   const visible = useMemo(() => {
     return results.filter((u) => {
@@ -85,11 +94,19 @@ export default function SearchPage() {
         </div>
       ) : (
         <div className="grid grid-cols-3 gap-2.5">
-          {visible.map((u) => (
+          {visible.map((u) => {
+            const src = mediaUrl(u.avatarUrl);
+            return (
             <Link key={u.id} href={`/app/profile/${u.id}`} className="rounded-2xl overflow-hidden border border-surface-border bg-surface-raised">
               <div className="relative aspect-square bg-surface-overlay">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={u.avatarUrl!} alt={u.displayName} className="w-full h-full object-cover" />
+                {src ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img src={src} alt={u.displayName} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center font-bold text-brand-300 text-xl bg-gradient-to-br from-surface-overlay to-surface-raised">
+                    {(u.displayName || '?').charAt(0).toUpperCase()}
+                  </div>
+                )}
                 {u.onlineStatus && <span className="absolute top-2 left-2 h-2.5 w-2.5 rounded-full bg-green-500 border-2 border-surface" />}
               </div>
               <div className="p-2">
@@ -97,7 +114,8 @@ export default function SearchPage() {
                 <p className="text-[10px] text-white/50 truncate">{u.countryCode}{u.distance ? ` · ${u.distance}` : ''}</p>
               </div>
             </Link>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

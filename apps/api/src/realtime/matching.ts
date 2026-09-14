@@ -1,7 +1,7 @@
 import { kv } from './store';
 import { prisma } from '@vuzki/database';
 import { isBlockedPair } from '../services/ai-moderation';
-import { computeCompatibility, normalizeGender, oppositeOf, isStrictlyOppositeGender } from '../services/matching';
+import { computeCompatibility, normalizeGender, oppositeOf, isStrictlyOppositeGender, findUnavailableUserIds } from '../services/matching';
 import { allow } from './ratelimit';
 import { getPresence } from './presence';
 
@@ -133,7 +133,14 @@ async function findCompatibleCandidate(entry: TalkNowEntry): Promise<ScoredCandi
 
   const scored: ScoredCandidate[] = [];
 
-  for (const uid of [...new Set([...candidateIds, ...onlineUsers.map((u) => u.id)])]) {
+  const poolIds = [...new Set([...candidateIds, ...onlineUsers.map((u) => u.id)])];
+  // Exclude anyone busy / mid-call / without a live presence proof so the queue
+  // balance function never hands a caller to a candidate who is ringing, in a
+  // call, or otherwise unavailable.
+  const busyIds = await findUnavailableUserIds(poolIds, { requirePresenceOnline: true });
+
+  for (const uid of poolIds) {
+    if (busyIds.has(uid)) continue;
     if (await isBlockedPair(entry.userId, uid)) continue;
     const other = onlineUsers.find((u) => u.id === uid) ??
       (await prisma.user.findUnique({ where: { id: uid }, include: { profile: true } }));
@@ -285,7 +292,9 @@ export async function getAvailableListeners(userId: string, limit = 20) {
     take: 100,
   });
   const out = [];
+  const busyIds = await findUnavailableUserIds(online.map((u) => u.id), { requirePresenceOnline: true });
   for (const u of online) {
+    if (busyIds.has(u.id)) continue;
     if (!isStrictlyOppositeGender(me.gender, u.gender)) continue;
     const { score, factors } = computeCompatibility(
       { interests: me?.profile?.interests ?? [], languages: me?.profile?.languages ?? [] },

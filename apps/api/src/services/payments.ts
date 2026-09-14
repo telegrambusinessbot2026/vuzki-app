@@ -251,9 +251,15 @@ export async function handlePaymentSuccess(params: { orderId: string; provider: 
 // SECURITY: demo fulfillment is ONLY allowed when the server is configured for
 // demo mode AND the stored order was actually created under the demo provider.
 // A client can never force fulfillment of a real order by sending demo:true.
-export async function verifyPaymentClient(params: { orderId: string; provider: string; paymentId?: string; signature?: string; demo?: boolean }) {
+export async function verifyPaymentClient(params: { userId: string; orderId: string; provider: string; paymentId?: string; signature?: string; demo?: boolean }) {
   const payment = await prisma.payment.findUnique({ where: { orderId: params.orderId } });
   if (!payment) throw new ApiErrorResponse(404, 'ORDER_NOT_FOUND', 'Order not found');
+  // OWNERSHIP: only the user who created the order may verify it. Without this
+  // guard any authenticated user who learns an orderId could complete a foreign
+  // order (or — in demo mode — have coins credited to a stranger's wallet).
+  if (payment.userId !== params.userId) {
+    throw new ApiErrorResponse(403, 'FORBIDDEN', 'This order does not belong to you');
+  }
   if (payment.status === PaymentStatus.COMPLETED) {
     return { alreadyProcessed: true, orderId: payment.orderId };
   }

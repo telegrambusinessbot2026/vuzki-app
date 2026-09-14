@@ -27,6 +27,7 @@ import {
   resolveMatchForUser,
 } from '../realtime/matching';
 import { kv } from '../realtime/store';
+import { setPresence, clearPresence } from '../realtime/presence';
 
 function makeUser(id: string, opts: any = {}) {
   return {
@@ -60,6 +61,8 @@ describe('Talk Now matchmaking', () => {
   afterEach(async () => {
     await cancelMatchmaking('u1');
     await cancelMatchmaking('u2');
+    await clearPresence('u1').catch(() => {});
+    await clearPresence('u2').catch(() => {});
     await kv.close();
   });
 
@@ -75,6 +78,8 @@ describe('Talk Now matchmaking', () => {
     mocks.userFindUnique.mockImplementation((args: any) => makeUser(args.where.id, args.where.id === 'u1' ? { gender: 'MALE' } : {}));
     // pool of online users includes u2 (female, opposite of u1)
     mocks.userFindMany.mockResolvedValue([makeUser('u2', { gender: 'FEMALE' })]);
+    // Talk Now only matches users with a live ONLINE presence proof.
+    await setPresence({ userId: 'u2', state: 'ONLINE', sessionId: 's2' });
 
     const { startMatchmaking: start2 } = await import('../realtime/matching');
     const res = await start2('u1', { mode: 'matched' });
@@ -107,6 +112,8 @@ describe('Hard gender rule (Opposite Gender matching)', () => {
   afterEach(async () => {
     await cancelMatchmaking('u1');
     await cancelMatchmaking('u2');
+    await clearPresence('u1').catch(() => {});
+    await clearPresence('u2').catch(() => {});
     await kv.close();
   });
 
@@ -132,6 +139,8 @@ describe('Hard gender rule (Opposite Gender matching)', () => {
   for (const [label, reqId, reqGender, otherId, otherGender, expected] of pairs) {
     it(`${label}`, async () => {
       mockPair({ id: reqId, gender: reqGender }, { id: otherId, gender: otherGender });
+      // Candidate needs a live ONLINE presence proof for Talk Now matching.
+      await setPresence({ userId: otherId, state: 'ONLINE', sessionId: `s_${otherId}` });
       const res = await startMatchmaking(reqId, { mode: 'random' });
       expect(res.ok).toBe(true);
       const entry = await getUserMatch(reqId);
@@ -153,10 +162,11 @@ describe('Hard gender rule (Opposite Gender matching)', () => {
       return makeUser('u2', { gender: 'FEMALE' });
     });
     mocks.userFindMany.mockResolvedValue([makeUser('u2', { gender: 'FEMALE' })]);
+    return setPresence({ userId: 'u2', state: 'ONLINE', sessionId: 's2' });
   }
 
   it('honors a specific opposite-gender preference from the request', async () => {
-    mockMaleRequesterWithFemalePool();
+    await mockMaleRequesterWithFemalePool();
 
     await startMatchmaking('u1', { mode: 'matched', preferredGender: 'female' });
     const entry = await getUserMatch('u1');
@@ -165,7 +175,7 @@ describe('Hard gender rule (Opposite Gender matching)', () => {
   });
 
   it('uses the saved genderPreference from the profile when no explicit preference is given', async () => {
-    mockMaleRequesterWithFemalePool({ genderPreference: 'female' });
+    await mockMaleRequesterWithFemalePool({ genderPreference: 'female' });
 
     await startMatchmaking('u1', { mode: 'matched' });
     const entry = await getUserMatch('u1');
@@ -177,11 +187,85 @@ describe('Hard gender rule (Opposite Gender matching)', () => {
     // u1 is male but has a stored preference for male users; the hard rule
     // cannot be satisfied by males, so the preference is ignored and u1 still
     // receives opposite-gender candidates.
-    mockMaleRequesterWithFemalePool({ genderPreference: 'male' });
+    await mockMaleRequesterWithFemalePool({ genderPreference: 'male' });
 
     await startMatchmaking('u1', { mode: 'matched' });
     const entry = await getUserMatch('u1');
     expect(entry?.state).toBe('MATCHED');
     expect(entry?.matchedWith).toBe('u2');
+  });
+});
+
+describe('Talk Now availability guards (busy / stale / in-call exclusion)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.isBlockedPair.mockResolvedValue(false);
+  });
+
+  afterEach(async () => {
+    await cancelMatchmaking('u1');
+    await cancelMatchmaking('u2');
+    await clearPresence('u1').catch(() => {});
+    await clearPresence('u2').catch(() => {});
+    await kv.close();
+  });
+
+  function mockMaleWaitingForFemale() {
+    mocks.userFindUnique.mockImplementation((args: any) => {
+      if (args.where.id === 'u1') return makeUser('u1', { gender: 'MALE' });
+      return makeUser('u2', { gender: 'FEMALE' });
+    });
+    mocks.userFindMany.mockResolvedValue([makeUser('u2', { gender: 'FEMALE' })]);
+  }
+
+  it('never matches a candidate whose presence is IN_CALL', async () => {
+    mockMaleWaitingForFemale();
+    await setPresence({ userId: 'u2', state: 'IN_CALL', sessionId: 's2', currentCall: 'c1' });
+
+    await startMatchmaking('u1', { mode: 'matched' });
+    const entry = await getUserMatch('u1');
+    expect(entry?.state).toBe('WAITING');
+    expect(entry?.matchedWith ?? null).toBeNull();
+  });
+
+  it('never matches a candidate whose presence is BUSY', async () => {
+    mockMaleWaitingForFemale();
+    await setPresence({ userId: 'u2', state: 'BUSY', sessionId: 's2' });
+
+    await startMatchmaking('u1', { mode: 'matched' });
+    const entry = await getUserMatch('u1');
+    expect(entry?.state).toBe('WAITING');
+    expect(entry?.matchedWith ?? null).toBeNull();
+  });
+
+  it('never matches a candidate with an explicit OFFLINE presence snapshot', async () => {
+    mockMaleWaitingForFemale();
+    await setPresence({ userId: 'u2', state: 'OFFLINE', sessionId: 's2' });
+
+    await startMatchmaking('u1', { mode: 'matched' });
+    const entry = await getUserMatch('u1');
+    expect(entry?.state).toBe('WAITING');
+    expect(entry?.matchedWith ?? null).toBeNull();
+  });
+
+  it('matches a candidate with a live ONLINE presence proof', async () => {
+    mockMaleWaitingForFemale();
+    await setPresence({ userId: 'u2', state: 'ONLINE', sessionId: 's2' });
+
+    await startMatchmaking('u1', { mode: 'matched' });
+    const entry = await getUserMatch('u1');
+    expect(entry?.state).toBe('MATCHED');
+    expect(entry?.matchedWith).toBe('u2');
+  });
+
+  it('never offers an unavailable candidate via the listener browser', async () => {
+    mocks.userFindUnique.mockResolvedValue(makeUser('u1', { gender: 'MALE', blocksReceived: [], blocksMade: [] }));
+    mocks.userFindMany.mockResolvedValue([makeUser('f1', { gender: 'FEMALE' })]);
+
+    // f1 is online in the DB but IN_CALL on the realtime layer.
+    await setPresence({ userId: 'f1', state: 'IN_CALL', sessionId: 's_f1' });
+    const { getAvailableListeners } = await import('../realtime/matching');
+    const out = await getAvailableListeners('u1', 20);
+    expect(out).toEqual([]);
   });
 });

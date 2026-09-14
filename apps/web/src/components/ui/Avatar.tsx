@@ -1,4 +1,5 @@
 import React from 'react';
+import { mediaUrl } from '@/lib/api';
 
 export function Avatar({
   src,
@@ -33,7 +34,7 @@ export function Avatar({
       >
         {src ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={src} alt={name || 'avatar'} className="w-full h-full object-cover" />
+          <img src={mediaUrl(src) ?? undefined} alt={name || 'avatar'} className="w-full h-full object-cover" />
         ) : (
           initial
         )}

@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { api, post } from '@/lib/api';
+import { api, post, mediaUrl } from '@/lib/api';
 import { mapFeed } from '@/lib/api-users';
 import type { FeedUser, PublicUser } from '@/lib/api-users';
 import { VerifiedIcon } from '@/components/ui/Avatar';
@@ -184,10 +184,18 @@ function SwipeCard({ user, overlay = '' }: { user: FeedUser; overlay?: string })
     return [...arr].slice(0, 4);
   }, [user]);
 
+  const src = mediaUrl(user.avatarUrl);
+
   return (
     <div className="absolute inset-0 rounded-3xl overflow-hidden border border-surface-border bg-surface-overlay">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={user.avatarUrl!} alt={user.displayName} className="w-full h-full object-cover" />
+      {src ? (
+        /* eslint-disable-next-line @next/next/no-img-element */
+        <img src={src} alt={user.displayName} className="w-full h-full object-cover" />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center font-bold text-brand-300 text-6xl bg-gradient-to-br from-surface-overlay to-surface-raised">
+          {(user.displayName || '?').charAt(0).toUpperCase()}
+        </div>
+      )}
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/20" />
 
       {overlay && (

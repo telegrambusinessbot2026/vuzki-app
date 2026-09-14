@@ -21,6 +21,7 @@ vi.mock('../services/ai-moderation', () => ({
 
 import { findCandidates } from '../services/matching';
 import { getAvailableListeners, cancelMatchmaking } from '../realtime/matching';
+import { setPresence, clearPresence } from '../realtime/presence';
 import { kv } from '../realtime/store';
 
 function makeUser(id: string, gender: string) {
@@ -145,6 +146,10 @@ describe('Talk Now listener browser gender rule', () => {
       makeUser('m1', 'MALE'),
       makeUser('o1', 'OTHER'),
     ]);
+    // candidates need a live ONLINE presence proof for Talk Now browsing.
+    await setPresence({ userId: 'f1', state: 'ONLINE', sessionId: 's_f1' });
+    await setPresence({ userId: 'm1', state: 'ONLINE', sessionId: 's_m1' });
+    await setPresence({ userId: 'o1', state: 'ONLINE', sessionId: 's_o1' });
 
     const out = await getAvailableListeners('u1', 20);
     expect(out.map((u: any) => u.gender)).toEqual(['FEMALE']);

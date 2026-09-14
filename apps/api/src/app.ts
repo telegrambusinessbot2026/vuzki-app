@@ -1,4 +1,5 @@
 import express from 'express';
+import path from 'path';
 import cors from 'cors';
 import helmet from 'helmet';
 import { config } from './config';
@@ -61,6 +62,11 @@ export function createApp() {
   app.get('/ready', readiness);
 
   app.use('/api/v1', auditLogger, routes);
+
+  // Uploaded files are stored under config.uploadDir and served as-is for the
+  // web frontend to load directly via /uploads/<type>/<filename> URLs.
+  // Using 'cross-origin' CORP in the helmet config above is enough; no auth needed here.
+  app.use('/uploads', express.static(path.join(process.cwd(), config.uploadDir)));
 
   app.use(notFound);
   app.use(errorHandler);

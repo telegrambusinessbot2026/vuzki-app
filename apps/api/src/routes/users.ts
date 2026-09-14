@@ -8,6 +8,7 @@ import { authenticate, AuthedRequest } from '../middleware/auth';
 import { verifyOtp } from '../services/otp';
 import { AccountStatus, OnboardingStep, WalletTransactionType } from '@vuzki/shared';
 import { debitCoins } from '../services/wallet';
+import { getPresence } from '../realtime/presence';
 
 export const userRoutes = Router();
 
@@ -126,8 +127,8 @@ const updateProfileSchema = z.object({
   dateOfBirth: z.string().datetime().optional(),
   countryCode: z.string().max(3).nullable().optional(),
   region: z.string().max(100).nullable().optional(),
-  avatarUrl: z.string().url().nullable().optional(),
-  bannerUrl: z.string().url().nullable().optional(),
+  avatarUrl: z.string().refine((u) => /^\/uploads\//.test(u) || /^https?:\/\//.test(u), 'Avatar must be an http(s) URL or an uploaded /uploads/ path').nullable().optional(),
+  bannerUrl: z.string().refine((u) => /^\/uploads\//.test(u) || /^https?:\/\//.test(u), 'Banner must be an http(s) URL or an uploaded /uploads/ path').nullable().optional(),
   interests: z.array(z.string()).max(20).optional(),
   languages: z.array(z.string()).max(10).optional(),
   onboardingStep: z.enum(['NONE', 'INTERESTS', 'LANGUAGES', 'PROFILE', 'COMPLETE']).optional(),
@@ -351,11 +352,26 @@ userRoutes.get('/me/blocked', authenticate(), wrap(async (req: AuthedRequest, re
 }));
 
 // PUT /users/me/online
+// Presence is server-authoritative (driven by active Socket.IO sessions). This
+// endpoint only lets a client *explicitly sign out* of online display
+// (online:false) or confirm a state that the realtime layer already holds.
+// A client claiming online:true with NO active socket session is ignored, so a
+// stale/offline user can never present themselves as online through a payload.
 userRoutes.put('/me/online', authenticate(), wrap(async (req: AuthedRequest, res) => {
   const { online } = z.object({ online: z.boolean() }).parse(req.body);
+  const userId = req.auth!.userId;
+
+  let effectiveOnline = online;
+  if (online === true) {
+    const snapshot = await getPresence(userId).catch(() => null);
+    const hasLiveSession =
+      snapshot && snapshot.currentSession && snapshot.state !== 'OFFLINE';
+    if (!hasLiveSession) effectiveOnline = false;
+  }
+
   await prisma.user.update({
-    where: { id: req.auth!.userId },
-    data: { onlineStatus: online, lastActiveAt: new Date() },
+    where: { id: userId },
+    data: { onlineStatus: effectiveOnline, lastActiveAt: new Date() },
   });
-  res.json({ success: true });
+  res.json({ success: true, data: { online: effectiveOnline } });
 }));

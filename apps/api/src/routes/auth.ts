@@ -107,6 +107,10 @@ authRoutes.post('/register', rateLimiter(15 * 60 * 1000, 5), wrap(async (req, re
       onboardingStep: OnboardingStep.NONE,
       status: AccountStatus.ACTIVE,
       wallet: { create: {} },
+      // Profile is part of the SAME atomic create as the user + wallet so a new
+      // account can never exist in a half-onboarded, profile-less state (and a
+      // crash mid-create leaves no partial user at all).
+      profile: { create: {} },
     },
   });
 
@@ -138,7 +142,19 @@ authRoutes.post('/register', rateLimiter(15 * 60 * 1000, 5), wrap(async (req, re
   });
 }));
 
+/** Create missing associated Profile / ProfilePreferences rows (idempotent). */
+async function ensureProfileRows(userId: string) {
+  await prisma.$transaction(async (tx) => {
+    await tx.profile.upsert({ where: { userId }, update: {}, create: { userId } });
+    await tx.profilePreferences.upsert({ where: { userId }, update: {}, create: { userId } });
+  });
+}
+
 async function loginExistingUser(res: any, user: any) {
+  // Backfill the associated Profile/ProfilePreferences rows for accounts
+  // created before profile auto-creation existed. Safe for every user and
+  // idempotent: only missing rows are created, production data is untouched.
+  await ensureProfileRows(user.id);
   const session = await createSession(user.id, res.req);
   const tokens = issueTokens({ userId: user.id, sessionId: session.id });
   const full = await prisma.user.findUnique({ where: { id: user.id }, include: { profile: true, wallet: true, preferences: true, subscriptions: { where: { status: 'ACTIVE' } } } });
@@ -356,6 +372,9 @@ authRoutes.get('/me', authenticate(), wrap(async (req: AuthedRequest, res) => {
     include: { profile: true, wallet: true, preferences: true, subscriptions: { where: { status: 'ACTIVE' } } },
   });
   if (!user) throw new ApiErrorResponse(404, 'USER_NOT_FOUND', 'User not found');
+  // Safe, idempotent backfill for accounts that predate profile auto-creation
+  // (or whose profile was created non-atomically). Never drops existing data.
+  await ensureProfileRows(user.id).catch(() => {});
   res.json({ success: true, data: { user: toSelfUser(user) } });
 }));
 

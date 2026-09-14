@@ -1,4 +1,4 @@
-﻿import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mocks = vi.hoisted(() => {
   const pkgFindUnique = vi.fn();
@@ -114,7 +114,7 @@ describe('payments: verifyPaymentClient (cannot force-fill a real order)', () =>
     mocks.paymentFindUnique.mockResolvedValue(demoOrder);
 
     // Client sends demo:true to try to force-fill - must NOT be honored.
-    const res = await verifyPaymentClient({ orderId: 'VZ_ABC', provider: 'demo', demo: true });
+    const res = await verifyPaymentClient({ orderId: 'VZ_ABC', userId: 'u1', provider: 'demo', demo: true });
 
     expect(res).toEqual({ requiresWebhook: true, orderId: 'VZ_ABC' });
     expect(mocks.paymentUpdateMany).not.toHaveBeenCalled();
@@ -126,7 +126,7 @@ describe('payments: verifyPaymentClient (cannot force-fill a real order)', () =>
     mocks.paymentFindUnique.mockResolvedValue(demoOrder);
     mocks.paymentUpdateMany.mockResolvedValue({ count: 1 });
 
-    const res = await verifyPaymentClient({ orderId: 'VZ_ABC', provider: 'demo', demo: true });
+    const res = await verifyPaymentClient({ orderId: 'VZ_ABC', userId: 'u1', provider: 'demo', demo: true });
 
     expect(res).toMatchObject({ success: true, orderId: 'VZ_ABC' });
   });
@@ -136,9 +136,22 @@ describe('payments: verifyPaymentClient (cannot force-fill a real order)', () =>
     cfg.demoMode = false;
     mocks.paymentFindUnique.mockResolvedValue({ ...demoOrder, status: 'COMPLETED' });
 
-    const res = await verifyPaymentClient({ orderId: 'VZ_ABC', provider: 'demo', demo: true });
+    const res = await verifyPaymentClient({ orderId: 'VZ_ABC', userId: 'u1', provider: 'razorpay' });
 
     expect(res).toEqual({ alreadyProcessed: true, orderId: 'VZ_ABC' });
     expect(mocks.paymentUpdateMany).not.toHaveBeenCalled();
+  });
+
+  it('rejects a caller who does not own the demo order (ownership guard)', async () => {
+    cfg.paymentProvider = 'demo';
+    cfg.demoMode = true;
+    // order VZ_ABC belongs to u1; a different authenticated user (u2) claims it.
+    mocks.paymentFindUnique.mockResolvedValue(demoOrder);
+
+    const foreign = verifyPaymentClient({ orderId: 'VZ_ABC', userId: 'u2', provider: 'demo', demo: true });
+
+    await expect(foreign).rejects.toThrow(/does not belong to you/);
+    expect(mocks.paymentUpdateMany).not.toHaveBeenCalled();
+    expect(mocks.walletUpsert).not.toHaveBeenCalled();
   });
 });

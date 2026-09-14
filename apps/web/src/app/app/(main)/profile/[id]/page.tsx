@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { api } from '@/lib/api';
+import { api, mediaUrl } from '@/lib/api';
 import { mapUser } from '@/lib/api-users';
 import type { FeedUser, PublicUser } from '@/lib/api-users';
 import { useAuth } from '@/lib/auth-context';
@@ -87,6 +87,7 @@ export default function OtherProfilePage() {
   }
 
   const isOwn = !!me && me.id === id;
+  const src = mediaUrl(user.avatarUrl);
 
   return (
     <div className="px-4 pt-4 pb-4">
@@ -99,8 +100,14 @@ export default function OtherProfilePage() {
       </header>
 
       <div className="relative h-56 rounded-3xl overflow-hidden border border-surface-border mb-4 bg-surface-overlay">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={user.avatarUrl!} alt={user.displayName} className="w-full h-full object-cover" />
+        {src ? (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img src={src} alt={user.displayName} className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center font-bold text-brand-300 text-6xl bg-gradient-to-br from-surface-overlay to-surface-raised">
+            {(user.displayName || '?').charAt(0).toUpperCase()}
+          </div>
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
         <div className="absolute top-3 left-3 flex gap-1.5">
           {user.isPremium && <PremiumBadge tier={user.premiumTier} />}

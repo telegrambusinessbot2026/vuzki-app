@@ -61,7 +61,7 @@ function fmtTime(iso: string): string {
 export default function ChatRoomPage() {
   const params = useParams();
   const id = String(params.id);
-  const { socket, connected, joinRoom, leaveRoom, emit, on } = useRealtime();
+  const { socket, connected, joinRoom, leaveRoom, emit, on, presence } = useRealtime();
 
   const [other, setOther] = useState<OtherUser | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -317,7 +317,11 @@ export default function ChatRoomPage() {
     });
 
   const displayName = other?.displayName || id;
-  const online = connected ? (other?.onlineStatus || true) : false;
+  // Online is OFFLINE by default (null/undefined -> false). Live presence from the
+  // realtime server (state strings, e.g. ONLINE/IN_CALL) overrides the hydrated
+  // DB `onlineStatus` value when present, fixing "Offline users shown as Online".
+  const livePresence = presence[id];
+  const online = connected ? (livePresence ? livePresence !== 'OFFLINE' : (other?.onlineStatus ?? false)) : false;
 
   return (
     <div className="flex flex-col h-[100dvh] max-w-md mx-auto w-full">

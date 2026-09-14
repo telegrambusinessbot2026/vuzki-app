@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
-import { api, ApiError } from '@/lib/api';
+import { api, ApiError, post, mediaUrl } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Input, TextArea, Select } from '@/components/ui/Input';
 import { ArrowLeftIcon, UserIcon } from '@/components/ui/Icons';
@@ -23,8 +23,10 @@ export default function EditProfilePage() {
   const [interests, setInterests] = useState('');
   const [languages, setLanguages] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
+  const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -38,6 +40,39 @@ export default function EditProfilePage() {
     setLanguages((user.languages ?? []).join(', '));
     setAvatarUrl(user.avatarUrl ?? '');
   }, [user]);
+
+  const readAsBase64 = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const r = reader.result as string;
+        resolve(r.split(',')[1] || '');
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    setError(null);
+    try {
+      const data = await readAsBase64(file);
+      const up = await post<{ url: string; key: string }>('/upload', {
+        type: 'avatar',
+        filename: file.name,
+        mime: file.type,
+        data,
+      });
+      setAvatarUrl(up.url);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not upload photo.');
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -107,7 +142,33 @@ export default function EditProfilePage() {
         <Input label="Country code" value={countryCode} onChange={(e) => setCountryCode(e.target.value.toUpperCase())} placeholder="IN" maxLength={3} />
         <Input label="Interests (comma separated)" value={interests} onChange={(e) => setInterests(e.target.value)} placeholder="Music, Travel, Food" />
         <Input label="Languages (comma separated, ISO codes)" value={languages} onChange={(e) => setLanguages(e.target.value)} placeholder="en, hi" />
-        <Input label="Profile photo URL" type="url" value={avatarUrl} onChange={(e) => setAvatarUrl(e.target.value)} placeholder="https://…" />
+
+        <div className="space-y-2">
+          <span className="block text-xs font-medium text-white/60">Profile photo</span>
+          <div className="flex items-center gap-3">
+            <div className="h-16 w-16 rounded-2xl overflow-hidden border border-surface-border bg-surface-overlay flex items-center justify-center">
+              {mediaUrl(avatarUrl) ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img src={mediaUrl(avatarUrl) ?? undefined} alt="Avatar" className="w-full h-full object-cover" />
+              ) : (
+                <UserIcon size={24} className="text-white/40" />
+              )}
+            </div>
+            <div className="flex-1">
+              <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                disabled={uploading}
+                className="h-10 px-4 rounded-xl bg-surface-overlay border border-surface-border text-xs font-semibold text-white/80 hover:bg-surface-raised disabled:opacity-50"
+              >
+                {uploading ? 'Uploading…' : 'Upload photo'}
+              </button>
+              <p className="text-[10px] text-white/40 mt-1">JPG, PNG, WebP, GIF or SVG up to 8 MB</p>
+            </div>
+          </div>
+          <Input label="Or pasted photo URL" type="url" value={avatarUrl} onChange={(e) => setAvatarUrl(e.target.value)} placeholder="https://…" />
+        </div>
 
         <div className="pt-2">
           <Button type="submit" variant="gradient" size="lg" full loading={loading}>

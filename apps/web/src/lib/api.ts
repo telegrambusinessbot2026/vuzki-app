@@ -1,6 +1,21 @@
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
 export const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4000';
 
+/** Origin of the API (API_URL without the trailing /api/v1). */
+export const API_ORIGIN = API_URL.replace(/\/api\/v1\/?$/, '');
+
+/**
+ * Resolve an API-relative media path (e.g. `/uploads/avatars/x.jpg` or
+ * `uploads/...`) into an absolute URL the browser can load. Absolute/empty
+ * values are returned unchanged. Never guessed: only joins what the server
+ * actually returned with the configured API origin.
+ */
+export function mediaUrl(url: string | null | undefined): string | null | undefined {
+  if (!url) return url;
+  if (/^https?:\/\//.test(url)) return url;
+  return `${API_ORIGIN}${url.startsWith('/') ? '' : '/'}${url}`;
+}
+
 const TOKEN_KEY = 'vuzki_access_token';
 const REFRESH_KEY = 'vuzki_refresh_token';
 
