@@ -1,5 +1,5 @@
-export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
-export const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4000';
+export const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
+export const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || '';
 
 /** Origin of the API (API_URL without the trailing /api/v1). */
 export const API_ORIGIN = API_URL.replace(/\/api\/v1\/?$/, '');

@@ -222,3 +222,34 @@ Production readiness requires **verified acceptance**: staging-tested migrations
 (typecheck/lint/tests/build/security scans), successful smoke tests, working health/readiness
 probes, and confirmed external integrations (payments, RTC, storage, AI moderation, OTP/SMTP, push,
 analytics). Do not ship to production without it.
+
+---
+
+## 12. Consolidated single-process deploy (current)
+
+The production deploy (see `render.yaml`) uses the consolidated topology instead
+of separate api/worker/admin containers:
+
+- ONE web service, ONE process, ONE port. `apps/web/server.js` starts the Next.js
+  app AND the Express API (`/api/v1`), Socket.IO (`/socket.io`), uploads
+  (`/uploads`) and the worker loops (`apps/api/src/worker-core.ts`) in the same
+  process.
+- **Build:** `npm install --include=dev && npm run build:consolidated`
+  (`turbo run build --filter=@vuzki/api --filter=@vuzki/web`).
+- **Start:** `npm run start:consolidated` → `node apps/web/server.js`, binding
+  `0.0.0.0:$PORT` (Render's `PORT`).
+- **Health:** `/health` (liveness) and `/ready` (readiness) are served by the
+  same process; the site root `/` is on the same origin.
+- **Same-origin env:** `NEXT_PUBLIC_API_URL=https://vuzki.app/api/v1`,
+  `NEXT_PUBLIC_SOCKET_URL=https://vuzki.app`, `CORS_ORIGINS=https://vuzki.app`,
+  `WEB_URL/ADMIN_URL/WEBSITE_URL/API_PUBLIC_URL=https://vuzki.app`. The browser
+  never calls `vuzki-api.onrender.com` in production.
+- Secrets required in production (fail-fast if missing): `JWT_SECRET`,
+  `JWT_REFRESH_SECRET`, `SESSION_SECRET`, `ADMIN_JWT_SECRET`, `DATABASE_URL`,
+  `REDIS_URL` (see `apps/api/src/config/index.ts`).
+- The separate `apps/admin` / `apps/website` apps and the `vuzki-worker` image
+  are NOT deployed in this topology; they remain for rollback/reference.
+
+Upload caveat: with `STORAGE_PROVIDER=local` media lives on the instance's local
+filesystem and is lost across redeploys; use `STORAGE_PROVIDER=s3` for durable,
+CDN-backed uploads.

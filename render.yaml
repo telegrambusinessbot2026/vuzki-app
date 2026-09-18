@@ -1,22 +1,24 @@
 # =====================================================================
 # VUZKI - Render Blueprint
 #
-# ONE frontend Web Service that serves BOTH:
+# ONE web service (vuzki-web) running the CONSOLIDATED single-process server
+# (apps/web/server.js) that serves the whole product on ONE port:
 #   1. the public VUZKI website  (https://vuzki.app/, /features, ...)
 #   2. the VUZKI web application (/auth/*, /app/*)
+#   3. the VUZKI admin panel     (/admin/*)
+#   4. the Express API           (/api/v1, /health, /ready, /uploads)
+#   5. Socket.IO realtime        (/socket.io)
+#   6. the worker loops          (deletions, retention, stale calls)
 #
-# The Next.js app at apps/web contains every route on the same service:
-#   /               -> website landing page
-#   /features       -> website page
-#   /auth/login     -> login
-#   /auth/register  -> registration
-#   /app/home       -> application
-#   /app/discover   -> application
-#   etc.
+# Start order inside server.js:
+#   http.createServer(dispatch) -> createRealtimeServer(httpServer) (Socket.IO)
+#   -> nextApp.prepare() -> startWorkerLoops() -> listen(0.0.0.0:$PORT)
 #
-# There is intentionally NO second frontend service for the app. The API
-# (apps/api - Express + Socket.IO) is a separate backend service and is NOT
-# defined here; see the commented API service below for the deploy recipe.
+# There is intentionally NO second backend service: the Express API and
+# Socket.IO run inside the SAME process as Next.js, so everything is same-origin
+# under https://vuzki.app and no CORS/server-URL configuration is needed.
+# The old separate admin (apps/admin) and website (apps/website) apps are kept
+# in the repo for rollback/reference but are NOT deployed.
 # =====================================================================
 
 services:
@@ -30,71 +32,59 @@ services:
     # to build the Next.js app and the @vuzki workspace packages. `--include=dev`
     # forces them to be installed for the build.
     #
-    # `npm run build:web` = `turbo run build --filter=@vuzki/web`. Turbo also runs
-    # `build` for the workspace dependencies first (@vuzki/shared, @vuzki/utils,
-    # @vuzki/types -> tsc -> dist), so imports resolve to compiled dist files.
-    buildCommand: npm install --include=dev && npm run build:web
-    # `npm run start:web` -> `next start`, which automatically listens on
-    # Render's PORT env var (NOT hard-coded to 3000). NOTE: the console line
-    # '"next start" does not work with "output: standalone"' is a non-fatal
-    # warning; next start serves fine here and is the production-safe path for
-    # this npm-workspace monorepo (the standalone trace omits @vuzki packages).
-    startCommand: npm run start:web
+    # `npm run build:consolidated` = `turbo run build --filter=@vuzki/api
+    # --filter=@vuzki/web`. Turbo builds the workspace dependencies first
+    # (@vuzki/shared, @vuzki/utils, @vuzki/types, @vuzki/database, @vuzki/api ->
+    # tsc -> dist), so the custom server's `@vuzki/api/dist/*` imports resolve.
+    buildCommand: npm install --include=dev && npm run build:consolidated
+    # `npm run start:consolidated` -> `node apps/web/server.js`. Listens on
+    # Render's PORT env var (0.0.0.0:$PORT) and serves web + API + Socket.IO +
+    # worker loops in one process (NOT `next start`, NOT standalone output).
+    startCommand: npm run start:consolidated
     healthCheckPath: /
     envVars:
       - key: NODE_VERSION
         value: "20.11.0"
       - key: NODE_ENV
         value: production
+      # Production fails fast unless these server secrets are set.
+      - key: JWT_SECRET
+        sync: false            # set in Render dashboard / secret manager
+      - key: JWT_REFRESH_SECRET
+        sync: false
+      - key: SESSION_SECRET
+        sync: false
+      - key: ADMIN_JWT_SECRET
+        sync: false
+      - key: DATABASE_URL
+        sync: false            # set in Render dashboard / secret manager
+      - key: REDIS_URL
+        sync: false
+      # ---- Same-origin routing (website, app AND API use https://vuzki.app) ----
+      - key: API_PUBLIC_URL
+        value: https://vuzki.app
+      - key: WEB_URL
+        value: https://vuzki.app
+      - key: ADMIN_URL
+        value: https://vuzki.app
+      - key: WEBSITE_URL
+        value: https://vuzki.app
+      - key: CORS_ORIGINS
+        value: https://vuzki.app
       # ---- Public / browser-safe (NEXT_PUBLIC_* are inlined at build time) ----
       - key: NEXT_PUBLIC_API_URL
-        value: https://vuzki-api.onrender.com/api/v1
+        value: https://vuzki.app/api/v1
       - key: NEXT_PUBLIC_SOCKET_URL
-        value: https://vuzki-api.onrender.com
+        value: https://vuzki.app
       - key: NEXT_PUBLIC_APP_NAME
         value: VUZKI
       - key: NEXT_PUBLIC_SITE_URL
         value: https://vuzki.app
 
   # ------------------------------------------------------------------
-  # VUZKI API (apps/api) - separate backend service.
-  # https://vuzki-api.onrender.com  (Express REST + Socket.IO realtime)
-  #
-  # Uncomment and fill secret env vars from the Render dashboard /
-  # secret manager when you are ready to deploy the backend:
-  #
-  # - type: web
-  #   name: vuzki-api
-  #   runtime: node
-  #   plan: starter
-  #   buildCommand: npm install --include=dev && npm run build:api
-  #   startCommand: npm run start:api
-  #   healthCheckPath: /health
-  #   envVars:
-  #     - key: NODE_VERSION
-  #       value: "20.11.0"
-  #     - key: NODE_ENV
-  #       value: production
-  #     - key: API_PORT
-  #       value: "4000"
-  #     - key: API_HOST
-  #       value: 0.0.0.0
-  #     - key: API_PUBLIC_URL
-  #       value: https://vuzki-api.onrender.com
-  #     # Frontend domain(s) that call the API. The single frontend runs on
-  #     # https://vuzki.app, so vuzki.app MUST be in this list.
-  #     - key: CORS_ORIGINS
-  #       value: https://vuzki.app,https://admin.vuzki.app
-  #     - key: WEB_URL
-  #       value: https://vuzki.app
-  #     - key: WEBSITE_URL
-  #       value: https://vuzki.app
-  #     - key: DATABASE_URL
-  #       sync: false            # set in Render dashboard / secret manager
-  #     - key: JWT_SECRET
-  #       sync: false
-  #     - key: JWT_REFRESH_SECRET
-  #       sync: false
-  #     - key: REDIS_URL
-  #       sync: false
-# =====================================================================
+  # CONSOLIDATED TOPOLOGY NOTE
+  # ------------------------------------------------------------------
+  # apps/api and apps/web are deployed together via build:consolidated above.
+  # There is NO separate vuzki-api service on Render anymore. All server env
+  # vars (payments, RTC, storage, SMTP, feature flags, etc.) are set on THIS
+  # service in the Render dashboard / secret manager.

@@ -50,7 +50,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!token) return;
 
-    const s = io(SOCKET_URL, {
+    const s = io(SOCKET_URL || undefined, {
       auth: { token },
       reconnection: true,
       reconnectionAttempts: Infinity,

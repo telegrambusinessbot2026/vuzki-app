@@ -56,6 +56,54 @@ Dockerfiles live in `infrastructure/docker/`:
   `NEXT_PUBLIC_SOCKET_URL`.
 - `Dockerfile.admin` - admin dashboard, build arg `NEXT_PUBLIC_API_URL`.
 
+The above is the **containerized** topology (separate api/worker/web images). VUZKI
+currently ships in the **consolidated single-process** topology described next;
+the container images remain for rollback/reference.
+
+## Consolidated single-process mode (current)
+
+The product can (and does) run as ONE Node process serving everything on ONE
+port — this is what `render.yaml` deploys today:
+
+- **Entrypoint:** `apps/web/server.js` (CommonJS; excluded from the `apps/web`
+  tsconfig so `next build` never type-checks it).
+- **Start order:** `http.createServer(dispatch)` registers the forwarding handler
+  FIRST → `createRealtimeServer(httpServer)` attaches Socket.IO (engine.io
+  snapshots the request listeners present at attach time and forwards non-`
+  /socket.io` traffic to them) → Express app from `@vuzki/api/dist/app.js`
+  handles `/api/*`, `/health`, `/ready`, `/uploads` → Next handler serves
+  website/app/admin → `startWorkerLoops()` starts the background loops →
+  `listen(0.0.0.0:$PORT)`.
+- **Same-origin by design:** web, API (`/api/v1`), Socket.IO (`/socket.io`) and
+  uploads (`/uploads`) all share the origin (e.g. `https://vuzki.app`). No CORS,
+  no cross-origin cookies, no separate DNS names.
+- **Admin panel:** hosted at `/admin/*` inside `apps/web` (imports from
+  `@/components/admin`, `@/lib/admin`). `apps/admin` and `apps/website` remain
+  in the repo for rollback/reference only.
+- **Worker loops:** extracted into `apps/api/src/worker-core.ts`
+  (`startWorkerLoops()`), shared by the standalone `worker.ts` entrypoint AND the
+  consolidated server, so they never drift.
+- **Admin JWT separation is preserved:** admin endpoints still verify a token
+  signed with the separate `ADMIN_JWT_SECRET`; production fails fast if any
+  secret is missing (`apps/api/src/config/index.ts`).
+
+Commands:
+
+```bash
+npm run build:consolidated   # turbo build @vuzki/api + @vuzki/web (+ deps)
+npm run start:consolidated   # node apps/web/server.js  (production)
+npm run dev:consolidated     # node apps/web/server.js  (NODE_ENV != production)
+```
+
+### Upload persistence limitation
+
+`STORAGE_PROVIDER=local` saves files to the local filesystem (`UPLOAD_DIR`) and is
+served from `/uploads` by Express. In a single-process deploy this works but the
+local disk is **ephemeral and non-shared** — uploaded media will be lost on
+re-deploy/restart and cannot be shared across instances. The storage layer
+(`apps/api/src/services/storage.ts`) already abstracts provider selection; set
+`STORAGE_PROVIDER=s3` (S3-compatible) for durable, CDN-backed uploads.
+
 `infrastructure/docker/docker-compose.yml` models the full stack locally:
 
 - `postgres` (16-alpine) and `redis` (7-alpine) with healthchecks and persisted
