@@ -71,69 +71,79 @@ export default function RegisterPage() {
 
   return (
     <RedirectIfAuthed>
-      <div className="min-h-screen bg-surface px-6 py-8 flex flex-col">
-        <Link href="/" className="p-2 -ml-2 mb-4 self-start rounded-full hover:bg-surface-overlay text-white/70">
-          <ArrowLeftIcon />
+      <div className="min-h-dvh bg-[#0a0a0c] px-6 flex flex-col justify-center relative overflow-hidden">
+        {/* Decorative background elements */}
+        <div className="absolute top-[-20%] right-[-10%] w-[60%] h-[50%] bg-brand-600/20 blur-[120px] rounded-full pointer-events-none" />
+        <div className="absolute bottom-[-10%] left-[-10%] w-[50%] h-[40%] bg-pink-600/20 blur-[120px] rounded-full pointer-events-none" />
+
+        <Link href="/" className="absolute top-safe mt-6 left-6 h-10 w-10 flex items-center justify-center rounded-full bg-white/5 border border-white/10 text-white/70 hover:bg-white/10 active:scale-95 transition-all z-10">
+          <ArrowLeftIcon size={18} />
         </Link>
 
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold tracking-tight">
-            Create your <span className="bg-gradient-to-r from-brand-400 to-pink-500 bg-clip-text text-transparent">account</span>
+        <div className="mb-6 mt-16 relative z-10 text-center">
+          <h1 className="text-3xl font-extrabold tracking-tight text-white mb-2">
+            Create your <span className="bg-gradient-to-r from-brand-400 to-pink-500 bg-clip-text text-transparent drop-shadow-sm">account</span>
           </h1>
-          <p className="text-white/50 text-sm mt-1">Join millions on VUZKI</p>
+          <p className="text-white/60 text-sm font-medium">Join millions on VUZKI</p>
         </div>
 
-        <form onSubmit={handleRegister} className="space-y-4 flex-1">
-          <Input label="Username" placeholder="coolmaya" value={username} onChange={(e) => setUsername(e.target.value)} required />
-          <Input label="Email" type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
-          <Input label="Phone" type="tel" placeholder="+1 555 000 1234" value={phone} onChange={(e) => setPhone(e.target.value)} required />
-          <div className="grid grid-cols-2 gap-3">
-            <PasswordInput label="Password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required />
-            <PasswordInput label="Confirm" placeholder="••••••••" value={confirm} onChange={(e) => setConfirm(e.target.value)} required />
-          </div>
-
-          <div>
-            <span className="block text-sm font-medium text-white/80 mb-1.5">Gender</span>
-            <div className="flex gap-2">
-              {genders.map((g) => (
-                <Chip key={g} selected={gender === g} onClick={() => setGender(g)}>{g}</Chip>
-              ))}
+        <div className="glass-panel rounded-3xl p-6 relative z-10 border border-white/10 shadow-float mb-6">
+          <form onSubmit={handleRegister} className="space-y-4 flex-1">
+            <Input label="Username" placeholder="coolmaya" value={username} onChange={(e) => setUsername(e.target.value)} required />
+            <Input label="Email" type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            <Input label="Phone" type="tel" placeholder="+1 555 000 1234" value={phone} onChange={(e) => setPhone(e.target.value)} required />
+            <div className="grid grid-cols-2 gap-3">
+              <PasswordInput label="Password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required />
+              <PasswordInput label="Confirm" placeholder="••••••••" value={confirm} onChange={(e) => setConfirm(e.target.value)} required />
             </div>
+
+            <div>
+              <span className="block text-xs font-bold uppercase tracking-wider text-white/60 mb-2 pl-1">Gender</span>
+              <div className="flex gap-2">
+                {genders.map((g) => (
+                  <Chip key={g} selected={gender === g} onClick={() => setGender(g)}>{g}</Chip>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <Input label="Age" type="number" min={18} max={99} placeholder="23" value={age} onChange={(e) => setAge(e.target.value)} required />
+              <Select label="Country" options={countries} value={country} onChange={(e) => setCountry(e.target.value)} />
+            </div>
+
+            <label className="flex items-start gap-3 mt-4 mb-2 cursor-pointer group">
+              <div className="relative flex items-center justify-center mt-0.5">
+                <input
+                  type="checkbox"
+                  checked={terms}
+                  onChange={(e) => setTerms(e.target.checked)}
+                  className="peer appearance-none h-5 w-5 rounded border border-white/20 bg-white/5 checked:bg-brand-500 checked:border-brand-500 transition-all cursor-pointer"
+                />
+                <svg className="absolute w-3 h-3 text-white pointer-events-none opacity-0 peer-checked:opacity-100 transition-opacity" viewBox="0 0 14 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M1 5L4.5 8.5L13 1" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+              <span className="text-xs text-white/60 font-medium group-hover:text-white/80 transition-colors leading-relaxed">
+                I agree to the <Link href="/terms" className="text-brand-400 hover:text-brand-300">Terms of Service</Link> and <Link href="/privacy" className="text-brand-400 hover:text-brand-300">Privacy Policy</Link>
+              </span>
+            </label>
+
+            {error && (
+              <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-medium px-4 py-3 rounded-2xl animate-shake">
+                {error}
+              </div>
+            )}
+
+            <Button type="submit" variant="gradient" size="lg" full loading={loading} className="mt-6 shadow-glow">
+              Create Account
+            </Button>
+          </form>
+
+          <div className="mt-6 pt-6 border-t border-white/10 flex items-center justify-center text-sm font-medium">
+             <span className="text-white/50 mr-2">Already have an account?</span>
+             <Link href="/auth/login" className="text-brand-300 font-bold hover:text-brand-200 transition-colors">Log in</Link>
           </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <Input label="Age" type="number" min={18} max={99} placeholder="23" value={age} onChange={(e) => setAge(e.target.value)} required />
-            <Select label="Country" options={countries} value={country} onChange={(e) => setCountry(e.target.value)} />
-          </div>
-
-          <label className="flex items-start gap-2 text-xs text-white/60">
-            <input
-              type="checkbox"
-              checked={terms}
-              onChange={(e) => setTerms(e.target.checked)}
-              className="mt-0.5 h-4 w-4 rounded accent-brand-600"
-            />
-            <span>
-              I agree to the <span className="text-brand-400">Terms of Service</span> and <span className="text-brand-400">Privacy Policy</span>
-            </span>
-          </label>
-
-          {error && <p className="text-sm text-red-400">{error}</p>}
-
-          <Button type="submit" variant="gradient" size="lg" full loading={loading}>
-            Create Account
-          </Button>
-
-          {/* TODO(oauth): Google & Apple sign-up buttons are intentionally hidden
-            until a real backend OAuth flow exists (authorization redirect,
-            callback, code/token exchange, ID-token verification, account
-            linking, and token issuance). Do NOT re-add these buttons or present
-            them as working sign-up methods until that flow is implemented. */}
-
-          <p className="text-center text-sm text-white/50">
-            Already have an account? <Link href="/auth/login" className="text-brand-400 font-semibold">Log in</Link>
-          </p>
-        </form>
+        </div>
       </div>
     </RedirectIfAuthed>
   );

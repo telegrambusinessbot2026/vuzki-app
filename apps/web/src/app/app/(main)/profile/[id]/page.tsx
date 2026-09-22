@@ -90,16 +90,9 @@ export default function OtherProfilePage() {
   const src = mediaUrl(user.avatarUrl);
 
   return (
-    <div className="px-4 pt-4 pb-4">
-      <header className="flex items-center justify-between mb-4">
-        <Link href="/app/home" className="p-2 -ml-2 rounded-full hover:bg-surface-overlay text-white/80"><ArrowLeftIcon /></Link>
-        <h1 className="font-bold text-lg">{isOwn ? 'Your profile' : 'Profile'}</h1>
-        <Link href="/app/safety" className="p-2 -mr-2 rounded-full hover:bg-surface-overlay text-white/70">
-          <FlagIcon />
-        </Link>
-      </header>
-
-      <div className="relative h-56 rounded-3xl overflow-hidden border border-surface-border mb-4 bg-surface-overlay">
+    <div className="relative min-h-dvh bg-[#0a0a0c] pb-[100px]">
+      {/* Immersive Header Image */}
+      <div className="relative h-[400px] w-full">
         {src ? (
           /* eslint-disable-next-line @next/next/no-img-element */
           <img src={src} alt={user.displayName} className="w-full h-full object-cover" />
@@ -108,88 +101,103 @@ export default function OtherProfilePage() {
             {(user.displayName || '?').charAt(0).toUpperCase()}
           </div>
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
-        <div className="absolute top-3 left-3 flex gap-1.5">
-          {user.isPremium && <PremiumBadge tier={user.premiumTier} />}
-          {user.badges.includes('TRENDING') && <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/80 text-black font-bold">🔥 Hot</span>}
+        <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0c] via-black/30 to-transparent" />
+        
+        <div className="absolute top-0 inset-x-0 pt-safe px-4 py-3 flex items-center justify-between z-10">
+          <Link href="/app/home" className="h-10 w-10 flex items-center justify-center rounded-full bg-black/30 backdrop-blur-md border border-white/10 text-white hover:bg-black/50 active:scale-95 transition-all"><ArrowLeftIcon size={18} /></Link>
+          <Link href="/app/safety" className="h-10 w-10 flex items-center justify-center rounded-full bg-black/30 backdrop-blur-md border border-white/10 text-white/70 hover:text-red-400 active:scale-95 transition-all">
+            <FlagIcon size={18} />
+          </Link>
         </div>
-        <div className="absolute bottom-3 left-4 right-4 flex items-end justify-between">
-          <div className="flex items-center gap-2">
-            <Avatar src={user.avatarUrl} name={user.displayName} size="lg" online={user.onlineStatus} verified={user.isVerified} className="ring-4 ring-black/40" />
-            <div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-xl font-bold">{user.displayName}{user.age ? `, ${user.age}` : ''}</span>
-                {user.isVerified && <VerifiedIcon size={15} />}
-              </div>
-              <p className="text-xs text-white/80">{user.city} · Speaks {user.languages[0] || ''}</p>
-            </div>
-          </div>
-          <div className="flex gap-1.5">
+
+        <div className="absolute bottom-6 left-5 right-5 flex flex-col justify-end">
+          <div className="flex gap-2 mb-3">
+            {user.isPremium && <PremiumBadge tier={user.premiumTier} />}
+            {user.badges.includes('TRENDING') && <span className="text-[10px] px-2.5 py-1 rounded-full bg-amber-500 text-black font-bold tracking-wider uppercase shadow-glow">🔥 Hot</span>}
             {user.isCreator && <CreatorBadge />}
-            {user.totalCoins && (
-              <span className="flex items-center gap-1 text-[11px] text-amber-400">
-                <CoinIcon size={13} /> {user.totalCoins.toLocaleString()}
-              </span>
-            )}
+          </div>
+          
+          <div className="flex items-center gap-4">
+             <Avatar src={user.avatarUrl} name={user.displayName} size="xl" online={user.onlineStatus} verified={user.isVerified} className="ring-4 ring-black/40 shadow-xl" />
+             <div>
+               <h1 className="text-3xl font-extrabold tracking-tight text-white drop-shadow-md">{user.displayName}{user.age ? `, ${user.age}` : ''}</h1>
+               <p className="text-sm text-white/80 font-medium drop-shadow-sm flex items-center gap-1.5 mt-0.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-brand-400"></span>
+                  {user.city} · Speaks {user.languages[0] || ''}
+               </p>
+             </div>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-2 mb-4">
-        <div className="text-center py-2 rounded-xl bg-surface-raised border border-surface-border">
-          <p className="font-bold">{(user.followers ?? 0).toLocaleString()}</p>
-          <p className="text-[11px] text-white/50">Followers</p>
+      <div className="px-5 -mt-2 relative z-10">
+        {/* Action Buttons */}
+        <div className="flex gap-2 mb-6">
+          <Link href={`/app/chat/${user.id}`} className="flex-1">
+            <Button variant="gradient" size="md" full icon={<ChatIcon size={18} />} className="shadow-glow">Message</Button>
+          </Link>
+          <Link href={`/app/call/${user.id}?type=video&name=${encodeURIComponent(user.displayName)}`}>
+             <button className="h-[46px] w-[46px] rounded-2xl glass flex items-center justify-center text-white border-white/10 active:scale-95 transition-transform"><VideoIcon size={20} /></button>
+          </Link>
+          <Link href={`/app/call/${user.id}?type=audio&name=${encodeURIComponent(user.displayName)}`}>
+             <button className="h-[46px] w-[46px] rounded-2xl glass flex items-center justify-center text-white border-white/10 active:scale-95 transition-transform"><PhoneIcon size={20} /></button>
+          </Link>
         </div>
-        <div className="text-center py-2 rounded-xl bg-surface-raised border border-surface-border">
-          <p className="font-bold">{(user.following ?? 0).toLocaleString()}</p>
-          <p className="text-[11px] text-white/50">Following</p>
+
+        {/* Stats */}
+        <div className="grid grid-cols-3 gap-3 mb-6">
+          <div className="text-center py-3 rounded-2xl glass-panel border border-white/5">
+            <p className="text-lg font-bold text-white">{(user.followers ?? 0).toLocaleString()}</p>
+            <p className="text-[10px] uppercase font-bold tracking-wider text-white/40 mt-0.5">Followers</p>
+          </div>
+          <div className="text-center py-3 rounded-2xl glass-panel border border-white/5">
+            <p className="text-lg font-bold text-white">{(user.following ?? 0).toLocaleString()}</p>
+            <p className="text-[10px] uppercase font-bold tracking-wider text-white/40 mt-0.5">Following</p>
+          </div>
+          <div className="text-center py-3 rounded-2xl glass-panel border border-white/5">
+            <p className="text-lg font-bold text-white">{(user.profileViews ?? 0).toLocaleString()}</p>
+            <p className="text-[10px] uppercase font-bold tracking-wider text-white/40 mt-0.5">Views</p>
+          </div>
         </div>
-        <div className="text-center py-2 rounded-xl bg-surface-raised border border-surface-border">
-          <p className="font-bold">{(user.profileViews ?? 0).toLocaleString()}</p>
-          <p className="text-[11px] text-white/50">Views</p>
+
+        {/* About */}
+        <div className="mb-8">
+          <h3 className="font-bold text-lg mb-2">About</h3>
+          <p className="text-sm text-white/70 leading-relaxed font-medium">{user.bio}</p>
+          <div className="flex flex-wrap gap-2 mt-4">
+            {user.interests.map((it) => (
+              <span key={it} className="text-[11px] font-bold uppercase tracking-wider px-3.5 py-1.5 rounded-full bg-white/5 border border-white/10 text-white/80">{it}</span>
+            ))}
+          </div>
+        </div>
+
+        {/* Interactions */}
+        <div className="flex gap-3">
+          <Link href={`/app/gifts?receiverId=${user.id}`} className="flex-1">
+            <Button variant="secondary" size="md" full icon={<GiftIcon size={18} />} className="border-white/10 glass-panel">Gift</Button>
+          </Link>
+          <div className="flex-[2]">
+            <Button
+              variant={following ? 'secondary' : 'primary'}
+              size="md"
+              full
+              loading={followPending}
+              onClick={toggleFollow}
+              className={following ? 'glass-panel border-white/10 text-brand-300' : ''}
+            >
+              {following ? 'Following' : 'Follow'}
+            </Button>
+          </div>
+        </div>
+        
+        <div className="mt-8 flex justify-center">
+           {user.totalCoins && (
+             <div className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full glass-panel border border-amber-500/20 text-amber-400 font-bold text-sm shadow-glass">
+                <CoinIcon size={16} /> {(user.totalCoins || 0).toLocaleString()} coins earned
+             </div>
+           )}
         </div>
       </div>
-
-      <div className="mb-4">
-        <h3 className="font-semibold mb-1.5">About</h3>
-        <p className="text-sm text-white/60 leading-relaxed">{user.bio}</p>
-        <div className="flex flex-wrap gap-2 mt-3">
-          {user.interests.map((it) => (
-            <span key={it} className="text-[11px] px-3 py-1 rounded-full bg-surface-overlay border border-surface-border text-white/70">{it}</span>
-          ))}
-        </div>
-      </div>
-
-      <div className="flex gap-2 mb-4">
-        <Link href={`/app/chat/${user.id}`} className="flex-1">
-          <Button variant="gradient" size="md" full icon={<ChatIcon size={18} />}>Message</Button>
-        </Link>
-        <Link href={`/app/call/${user.id}?type=audio&name=${encodeURIComponent(user.displayName)}`}>
-          <Button variant="secondary" size="md" icon={<PhoneIcon size={18} />} className="px-4">Audio</Button>
-        </Link>
-        <Link href={`/app/call/${user.id}?type=video&name=${encodeURIComponent(user.displayName)}`}>
-          <Button variant="secondary" size="md" icon={<VideoIcon size={18} />} className="px-4">Video</Button>
-        </Link>
-      </div>
-
-      <div className="flex gap-2">
-        <Link href={`/app/gifts?receiverId=${user.id}`} className="flex-1">
-          <Button variant="outline" size="md" full icon={<GiftIcon size={18} />}>Send Gift</Button>
-        </Link>
-        <Button
-          variant={following ? 'secondary' : 'primary'}
-          size="md"
-          full
-          loading={followPending}
-          onClick={toggleFollow}
-        >
-          {following ? 'Following' : 'Follow'}
-        </Button>
-      </div>
-
-      <Link href="/app/safety" className="mt-4 flex items-center justify-center gap-1.5 text-xs text-white/40 hover:text-red-400 transition-colors">
-        <FlagIcon size={13} /> Report {user.displayName}
-      </Link>
     </div>
   );
 }

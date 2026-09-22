@@ -29,7 +29,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className={`${inter.variable} min-h-screen bg-surface text-white antialiased`}>
+      <body className={`${inter.variable} min-h-dvh bg-[#0a0a0c] text-white antialiased selection:bg-brand-500/30`}>
         <AuthProvider>
           <RealtimeProvider>{children}</RealtimeProvider>
         </AuthProvider>

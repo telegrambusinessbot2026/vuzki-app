@@ -85,7 +85,7 @@ const APP_CARDS = [
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-surface">
+    <div className="min-h-dvh bg-[#0a0a0c]">
       <MarketingHeader />
 
       {/* Hero */}

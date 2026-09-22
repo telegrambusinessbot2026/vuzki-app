@@ -89,13 +89,13 @@ export default function SettingsPage() {
   const regionLabel = user?.region || user?.countryCode || 'Global';
 
   return (
-    <div className="px-4 pt-4 pb-4">
-      <header className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-bold">Settings</h1>
+    <div className="px-4 pt-safe pt-4 pb-8 min-h-dvh bg-[#0a0a0c]">
+      <header className="flex items-center justify-between mb-8 mt-2">
+        <h1 className="text-3xl font-extrabold tracking-tight">Settings</h1>
       </header>
 
       <SectionTitle>Account</SectionTitle>
-      <Card className="divide-y divide-surface-border mb-5 overflow-hidden">
+      <Card className="divide-y divide-white/5 mb-8 glass-panel border border-white/5">
         <SettingsRow icon={<UserIcon size={18} />} label="Edit Profile" value={user?.displayName} href="/app/settings/profile" />
         <SettingsRow icon={<LockIcon size={18} />} label="Change Password" href="/app/settings/password" />
         <SettingsRow icon={<PhoneIcon size={18} />} label="Phone" value={user?.phone || 'Add phone'} href="/app/settings/identity" />
@@ -103,7 +103,7 @@ export default function SettingsPage() {
       </Card>
 
       <SectionTitle>Preferences</SectionTitle>
-      <Card className="divide-y divide-surface-border mb-5 overflow-hidden">
+      <Card className="divide-y divide-white/5 mb-8 glass-panel border border-white/5">
         <SettingsRow icon={<SettingsIcon size={18} />} label="Theme" value={user?.theme === 'light' ? 'Light' : 'Dark'} onClick={() => openModal('theme')} />
         <SettingsRow icon={<BellIcon size={18} />} label="Notifications" value="Manage" onClick={() => openModal('notifications')} />
         <SettingsRow icon={<DocumentIcon size={18} />} label="Language" value={LANGUAGES.find((l) => l.value === (user?.language ?? 'en'))?.label ?? 'English'} onClick={() => openModal('language')} />
@@ -111,23 +111,23 @@ export default function SettingsPage() {
       </Card>
 
       <SectionTitle>Privacy</SectionTitle>
-      <Card className="divide-y divide-surface-border mb-5 overflow-hidden">
+      <Card className="divide-y divide-white/5 mb-8 glass-panel border border-white/5">
         <SettingsRow icon={<UserIcon size={18} />} label="Who can message" value={whoCanLabel(user?.preferences?.whoCanMessage)} onClick={() => openModal('privacy')} />
         <SettingsRow icon={<EyeIcon size={18} />} label="Online status" value={user?.preferences?.showOnlineStatus === false ? 'Hidden' : 'Visible'} onClick={() => openModal('privacy')} />
         <SettingsRow icon={<ShieldIcon size={18} />} label="Blocked users" href="/app/settings/blocked" />
       </Card>
 
       <SectionTitle>Support</SectionTitle>
-      <Card className="divide-y divide-surface-border mb-6 overflow-hidden">
-        <SettingsRow icon={<DocumentIcon size={18} />} label="Help Center" href="/app/safety" />
+      <Card className="divide-y divide-white/5 mb-8 glass-panel border border-white/5">
+        <SettingsRow icon={<DocumentIcon size={18} />} label="Help Center" href="/safety" />
         <SettingsRow icon={<ShieldIcon size={18} />} label="Safety" href="/app/safety" />
-        <SettingsRow icon={<DocumentIcon size={18} />} label="Terms" href="/app/safety" />
-        <SettingsRow icon={<DocumentIcon size={18} />} label="Privacy Policy" href="/app/safety" />
+        <SettingsRow icon={<DocumentIcon size={18} />} label="Terms" href="/terms" />
+        <SettingsRow icon={<DocumentIcon size={18} />} label="Privacy Policy" href="/privacy" />
       </Card>
 
-      {logoutError && <p className="text-sm text-red-400 text-center mb-3">{logoutError}</p>}
+      {logoutError && <p className="text-sm text-red-400 text-center mb-4">{logoutError}</p>}
 
-      <Button variant="danger" size="lg" full loading={loggingOut} onClick={handleLogout}>
+      <Button variant="danger" size="lg" full loading={loggingOut} onClick={handleLogout} className="shadow-lg">
         Log out
       </Button>
 
@@ -145,8 +145,8 @@ export default function SettingsPage() {
                   key={t.value}
                   onClick={() => savePref({ theme: t.value })}
                   disabled={saving}
-                  className={`w-full text-left px-4 py-3 rounded-xl border text-sm font-medium transition-colors ${
-                    targetTheme === t.value ? 'border-brand-500 text-brand-300 bg-brand-600/10' : 'border-surface-border text-white/80 bg-surface-overlay hover:bg-surface-overlay/70'
+                  className={`w-full text-left px-5 py-4 rounded-2xl border text-sm font-bold transition-all active:scale-[0.98] ${
+                    targetTheme === t.value ? 'border-brand-500 text-brand-300 bg-brand-600/10 shadow-glow' : 'border-white/5 text-white/80 bg-white/5 hover:bg-white/10'
                   }`}
                 >
                   {t.label}
@@ -156,14 +156,14 @@ export default function SettingsPage() {
           )}
 
           {prefModal === 'language' && (
-            <div className="space-y-2">
+            <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
               {LANGUAGES.map((l) => (
                 <button
                   key={l.value}
                   onClick={() => savePref({ language: l.value })}
                   disabled={saving}
-                  className={`w-full text-left px-4 py-3 rounded-xl border text-sm font-medium transition-colors ${
-                    targetLanguage === l.value ? 'border-brand-500 text-brand-300 bg-brand-600/10' : 'border-surface-border text-white/80 bg-surface-overlay hover:bg-surface-overlay/70'
+                  className={`w-full text-left px-5 py-4 rounded-2xl border text-sm font-bold transition-all active:scale-[0.98] ${
+                    targetLanguage === l.value ? 'border-brand-500 text-brand-300 bg-brand-600/10 shadow-glow' : 'border-white/5 text-white/80 bg-white/5 hover:bg-white/10'
                   }`}
                 >
                   {l.label}
@@ -305,7 +305,7 @@ function modalTitle(m: PrefModal): string {
 }
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
-  return <h2 className="text-[11px] font-semibold text-white/40 uppercase tracking-wide mb-2">{children}</h2>;
+  return <h2 className="text-[11px] font-bold text-white/40 uppercase tracking-widest mb-3 pl-2">{children}</h2>;
 }
 
 function ToggleRow({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
@@ -313,21 +313,23 @@ function ToggleRow({ label, checked, onChange }: { label: string; checked: boole
     <button
       type="button"
       onClick={() => onChange(!checked)}
-      className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-surface-overlay border border-surface-border"
+      className="w-full flex items-center justify-between px-4 py-4 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors"
     >
-      <span className="text-sm font-medium text-white/80">{label}</span>
-      <span className={`w-11 h-6 rounded-full transition-colors ${checked ? 'bg-brand-500' : 'bg-white/15'}`} />
+      <span className="text-sm font-bold text-white/90">{label}</span>
+      <span className={`w-12 h-7 rounded-full transition-colors relative shadow-inner ${checked ? 'bg-brand-500 shadow-glow' : 'bg-white/10'}`}>
+         <span className={`absolute top-1 left-1 w-5 h-5 bg-white rounded-full transition-transform ${checked ? 'translate-x-5' : 'translate-x-0'}`} />
+      </span>
     </button>
   );
 }
 
 function Modal({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center">
-      <div className="w-full max-w-sm bg-surface-raised border border-surface-border rounded-t-3xl sm:rounded-3xl p-5 pb-8">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-bold">{title}</h2>
-          <button onClick={onClose} className="p-2 rounded-full hover:bg-surface-overlay text-white/70" aria-label="Close">
+    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
+      <div className="w-full max-w-sm glass-panel border border-white/10 rounded-3xl p-6 pb-8 shadow-float animate-slide-up">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-extrabold">{title}</h2>
+          <button onClick={onClose} className="p-2 rounded-full bg-white/5 hover:bg-white/10 text-white/70 active:scale-90 transition-transform" aria-label="Close">
             <CloseIcon size={18} />
           </button>
         </div>

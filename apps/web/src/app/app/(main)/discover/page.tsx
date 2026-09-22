@@ -13,26 +13,23 @@ import { CloseIcon, HeartIcon, RefreshIcon, SparkleIcon, StarIcon, ZapIcon, Phon
 
 export default function DiscoverPage() {
   return (
-    <div className="relative min-h-[calc(100vh-8rem)] flex flex-col overflow-hidden">
-      <header className="px-4 pt-4 pb-2 flex items-center justify-between">
+    <div className="relative min-h-dvh flex flex-col overflow-hidden pb-[120px]">
+      <header className="px-4 pt-safe pt-4 pb-2 flex items-center justify-between relative z-10">
         <div>
-          <h1 className="text-xl font-bold">Discover</h1>
-          <p className="text-xs text-white/50">Swipe right to connect</p>
+          <h1 className="text-2xl font-extrabold tracking-tight">Discover</h1>
+          <p className="text-xs text-white/50 font-medium mt-0.5">Swipe right to connect</p>
         </div>
-        <div className="flex gap-2">
-          <Link href="/app/talknow" className="flex items-center gap-1 px-3 py-2 rounded-full bg-gradient-to-r from-brand-600 to-pink-600 text-white text-xs font-bold shadow-glow">
-            <PhoneIcon size={12} /> Talk Now
+        <div className="flex gap-2.5">
+          <Link href="/app/talknow" className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-brand-gradient text-white text-xs font-bold shadow-glow hover:shadow-glow-pink transition-all active:scale-95">
+            <PhoneIcon size={14} /> Talk Now
           </Link>
-          <Link href="/app/filters" className="p-2 rounded-full bg-surface-overlay border border-surface-border text-white/70 hover:text-white">
+          <Link href="/app/filters" className="p-2 rounded-full bg-white/5 border border-white/10 text-white/70 hover:text-white transition-colors active:scale-95">
             <FilterIcon />
-          </Link>
-          <Link href="/app/premium" className="flex items-center gap-1 px-3 py-2 rounded-full bg-gradient-to-r from-amber-400 to-yellow-300 text-black text-xs font-bold">
-            <StarIcon size={12} /> Get Plus
           </Link>
         </div>
       </header>
 
-      <div className="flex-1 flex flex-col items-center justify-center px-4">
+      <div className="flex-1 flex flex-col items-center justify-center px-4 relative z-0">
         <SwipeStack />
       </div>
     </div>
@@ -155,25 +152,25 @@ function SwipeStack() {
       </AnimatePresence>
 
       {/* Action buttons */}
-      <div className="absolute -bottom-4 inset-x-0 flex items-center justify-center gap-5">
-        <button onClick={() => onSwipe('left')} className="h-14 w-14 rounded-full bg-surface-raised border border-surface-border text-white/80 flex items-center justify-center shadow active:scale-90 transition-transform" aria-label="Pass">
-          <CloseIcon />
+      <div className="absolute -bottom-6 inset-x-0 flex items-center justify-center gap-4 z-20">
+        <button onClick={() => onSwipe('left')} className="h-14 w-14 rounded-full glass backdrop-blur-xl border-white/10 text-white/80 flex items-center justify-center shadow-glass active:scale-90 hover:bg-white/10 transition-all" aria-label="Pass">
+          <CloseIcon size={20} />
         </button>
-        <button onClick={() => onSwipe('left')} className="h-11 w-11 rounded-full bg-surface-raised border border-surface-border text-blue-400 flex items-center justify-center active:scale-90 transition-transform" aria-label="Rewind">
+        <button onClick={() => onSwipe('left')} className="h-12 w-12 rounded-full glass backdrop-blur-xl border-white/10 text-blue-400 flex items-center justify-center shadow-glass active:scale-90 hover:bg-white/10 transition-all" aria-label="Rewind">
           <RefreshIcon size={18} />
         </button>
-        <button onClick={() => onSwipe('right')} className="h-14 w-14 rounded-full bg-surface-raised border border-surface-border text-brand-500 flex items-center justify-center shadow active:scale-90 transition-transform" aria-label="Like">
-          <SparkleIcon />
+        <button onClick={() => onSwipe('right')} className="h-14 w-14 rounded-full glass backdrop-blur-xl border-white/10 text-brand-400 flex items-center justify-center shadow-glass active:scale-90 hover:bg-brand-500/10 transition-all" aria-label="Like">
+          <SparkleIcon size={22} />
         </button>
-        <button onClick={() => onSwipe('right', 'super_like')} className="h-11 w-11 rounded-full bg-surface-raised border border-surface-border text-amber-400 flex items-center justify-center active:scale-90 transition-transform" aria-label="Super like">
+        <button onClick={() => onSwipe('right', 'super_like')} className="h-12 w-12 rounded-full glass backdrop-blur-xl border-white/10 text-amber-400 flex items-center justify-center shadow-glass active:scale-90 hover:bg-amber-500/10 transition-all" aria-label="Super like">
           <ZapIcon size={18} />
         </button>
-        <button onClick={() => onSwipe('right', 'super_like')} className="h-14 w-14 rounded-full bg-gradient-to-br from-pink-500 to-rose-500 border border-pink-400/40 flex items-center justify-center shadow active:scale-90 transition-transform" aria-label="Super like with heart">
-          <HeartIcon />
+        <button onClick={() => onSwipe('right', 'super_like')} className="h-14 w-14 rounded-full bg-gradient-to-br from-pink-500 to-rose-600 border border-pink-400/40 flex items-center justify-center shadow-glow-pink active:scale-90 hover:scale-105 transition-all" aria-label="Super like with heart">
+          <HeartIcon size={20} className="text-white" />
         </button>
       </div>
-      <p className="text-center text-xs text-white/40 mt-16">{likeCount} liked</p>
-      {error && <p className="text-center text-xs text-red-400 mt-1">{error}</p>}
+      <p className="text-center text-[10px] text-white/40 mt-16 font-medium uppercase tracking-wider">{likeCount} liked</p>
+      {error && <p className="text-center text-xs text-red-400 mt-2 bg-red-500/10 rounded-lg py-1 px-3 inline-block mx-auto">{error}</p>}
     </div>
   );
 }

@@ -84,26 +84,26 @@ export default function HomePage() {
       </header>
 
       {/* Curated daily card */}
-      <div className="relative rounded-3xl overflow-hidden mb-5 bg-brand-gradient-soft border border-surface-border">
-        <div className="absolute inset-0 bg-gradient-to-br from-brand-700/40 via-transparent to-pink-600/40" />
-        <div className="relative p-4 flex items-center justify-between">
+      <div className="relative rounded-3xl overflow-hidden mb-6 bg-gradient-to-br from-brand-900/40 to-pink-900/20 border border-white/5 shadow-float">
+        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 mix-blend-overlay" />
+        <div className="relative p-5 flex items-center justify-between">
           <div>
-            <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full glass text-[10px] text-white/90 mb-1.5">
-              <SparkleIcon size={10} /> DAILY CURATED
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/10 text-[10px] font-bold tracking-wider text-white/90 mb-2">
+              <SparkleIcon size={12} className="text-brand-300" /> DAILY CURATED
             </div>
-            <h3 className="font-bold text-lg leading-tight">Your perfect matches for today</h3>
-            <p className="text-white/70 text-xs mt-1">{featured.length} creators matched to you</p>
+            <h3 className="font-extrabold text-xl leading-tight text-white shadow-sm">Your perfect matches</h3>
+            <p className="text-brand-200/80 text-xs mt-1 font-medium">{featured.length} creators matched to you</p>
           </div>
           <div className="flex -space-x-3">
             {featured.slice(0, 3).map((u) => {
               const src = mediaUrl(u.avatarUrl);
               return (
-              <div key={u.id} className="h-12 w-12 rounded-full border-2 border-surface bg-surface-overlay overflow-hidden">
+              <div key={u.id} className="h-14 w-14 rounded-full border-2 border-surface bg-surface-overlay overflow-hidden shadow-glass">
                 {src ? (
                   /* eslint-disable-next-line @next/next/no-img-element */
                   <img src={src} alt={u.displayName} className="w-full h-full object-cover" />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center font-bold text-brand-300 text-base bg-gradient-to-br from-surface-overlay to-surface-raised">
+                  <div className="w-full h-full flex items-center justify-center font-bold text-brand-300 text-lg bg-surface-raised">
                     {(u.displayName || '?').charAt(0).toUpperCase()}
                   </div>
                 )}
@@ -115,18 +115,21 @@ export default function HomePage() {
       </div>
 
       {/* Talk Now CTA */}
-      <Link href="/app/talknow" className="block mb-5 rounded-2xl overflow-hidden relative bg-gradient-to-r from-brand-700 to-pink-700 border border-surface-border">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,rgba(255,255,255,0.18),transparent_55%)]" />
-        <div className="relative p-4 flex items-center justify-between">
+      <Link href="/app/talknow" className="group block mb-6 rounded-3xl overflow-hidden relative bg-brand-gradient border border-white/10 shadow-glow hover:shadow-glow-pink transition-all duration-300">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_100%_0%,rgba(255,255,255,0.3),transparent_50%)]" />
+        <div className="absolute top-0 right-0 p-8 opacity-20 group-hover:scale-110 group-hover:rotate-12 transition-transform duration-500">
+           <PhoneIcon size={120} />
+        </div>
+        <div className="relative p-5 flex items-center justify-between">
           <div>
-            <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-black/25 text-[10px] text-white/90 mb-1.5">
-              <PhoneIcon size={10} /> TALK NOW
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/20 backdrop-blur-md text-[10px] font-bold tracking-wider text-white mb-2 shadow-sm">
+              <PhoneIcon size={12} className="animate-pulse" /> LIVE NOW
             </div>
-            <h3 className="font-bold text-lg leading-tight">Chat with a random stranger now</h3>
-            <p className="text-white/70 text-xs mt-1">Live audio & video · no contact needed</p>
+            <h3 className="font-extrabold text-xl leading-tight text-white drop-shadow-md">Talk to a stranger</h3>
+            <p className="text-white/80 text-sm mt-1 font-medium">Audio & video · No matches needed</p>
           </div>
-          <div className="h-14 w-14 rounded-full bg-white/15 backdrop-blur border border-white/25 flex items-center justify-center shrink-0">
-            <PhoneIcon size={26} className="text-white" />
+          <div className="h-14 w-14 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center shrink-0 shadow-glass group-hover:scale-110 transition-transform duration-300">
+            <PhoneIcon size={24} className="text-white" />
           </div>
         </div>
       </Link>

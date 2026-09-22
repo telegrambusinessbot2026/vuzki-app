@@ -6,7 +6,7 @@ import { AuthGuard } from '@/components/shell/AuthGuard';
 export default function ChatDetailLayout({ children }: { children: React.ReactNode }) {
   return (
     <AuthGuard>
-      <div className="min-h-screen bg-surface flex flex-col">{children}</div>
+      <div className="min-h-dvh bg-[#0a0a0c] flex flex-col">{children}</div>
     </AuthGuard>
   );
 }

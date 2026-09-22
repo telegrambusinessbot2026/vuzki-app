@@ -325,53 +325,53 @@ export default function ChatRoomPage() {
   const online = connected ? (livePresence ? livePresence !== 'OFFLINE' : (other?.onlineStatus ?? false)) : false;
 
   return (
-    <div className="flex flex-col h-[100dvh] max-w-md mx-auto w-full">
+    <div className="flex flex-col h-dvh max-w-md mx-auto w-full bg-[#0a0a0c]">
       {/* Header */}
-      <header className="flex items-center gap-2 px-2 py-2.5 bg-surface-raised/95 backdrop-blur border-b border-surface-border">
-        <Link href="/app/chat" className="p-2 rounded-full hover:bg-surface-overlay text-white/80">
+      <header className="flex items-center gap-2 px-2 pt-safe pb-2.5 bg-black/60 backdrop-blur-xl border-b border-white/5 z-20">
+        <Link href="/app/chat" className="p-2 rounded-full hover:bg-white/10 text-white/80 active:scale-90 transition-transform">
           <ArrowLeftIcon />
         </Link>
         <Link href={`/app/profile/${id}`} className="flex items-center gap-2.5 flex-1 min-w-0">
           <Avatar src={other?.avatarUrl} name={displayName} size="sm" online={online} />
           <div className="min-w-0">
-            <p className="font-semibold text-sm truncate">{displayName}</p>
-            <p className="text-[11px] flex items-center gap-1.5">
-              <span className={`h-1.5 w-1.5 rounded-full ${connected ? 'bg-green-500' : 'bg-white/30'}`} />
-              {connected ? (otherTyping ? 'typing…' : 'Online') : 'Connecting…'}
+            <p className="font-bold text-sm truncate">{displayName}</p>
+            <p className="text-[11px] font-medium flex items-center gap-1.5 uppercase tracking-wider">
+              <span className={`h-1.5 w-1.5 rounded-full ${connected ? 'bg-green-400 shadow-glow' : 'bg-white/30'}`} />
+              <span className={connected ? 'text-green-400' : 'text-white/40'}>{connected ? (otherTyping ? 'typing' : 'Online') : 'Connecting'}</span>
             </p>
           </div>
         </Link>
         <div className="flex items-center gap-1">
-          <Link href={`/app/call/${id}?type=video&name=${encodeURIComponent(displayName)}`} className="p-2 rounded-full hover:bg-surface-overlay text-white/80" aria-label="Video call">
+          <Link href={`/app/call/${id}?type=video&name=${encodeURIComponent(displayName)}`} className="p-2 rounded-full hover:bg-white/10 text-white/80 active:scale-90 transition-transform" aria-label="Video call">
             <VideoIcon />
           </Link>
-          <Link href={`/app/call/${id}?type=audio&name=${encodeURIComponent(displayName)}`} className="p-2 rounded-full hover:bg-surface-overlay text-white/80" aria-label="Audio call">
+          <Link href={`/app/call/${id}?type=audio&name=${encodeURIComponent(displayName)}`} className="p-2 rounded-full hover:bg-white/10 text-brand-300 active:scale-90 transition-transform" aria-label="Audio call">
             <PhoneIcon />
           </Link>
         </div>
       </header>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto no-scrollbar px-3 py-4" onClick={() => setShowGifts(false)}>
+      <div className="flex-1 overflow-y-auto no-scrollbar px-3 py-4 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] bg-repeat" style={{ backgroundBlendMode: 'overlay', backgroundColor: 'rgba(10,10,12,0.95)' }} onClick={() => setShowGifts(false)}>
         {loading && (
-          <div className="text-center py-10 text-white/40 text-sm">Loading messages…</div>
+          <div className="text-center py-10 text-white/40 text-sm font-medium">Loading messages…</div>
         )}
         {!loading && (
           <>
-            <div className="flex justify-center mb-4">
-              <span className="text-[10px] px-2.5 py-1 rounded-full bg-surface-overlay text-white/40">
-                Messages are encrypted{other?.isVerified ? ` · ${displayName} is verified` : ''}
+            <div className="flex justify-center mb-6">
+              <span className="text-[10px] uppercase font-bold tracking-widest px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-white/40 backdrop-blur">
+                End-to-End Encrypted
               </span>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               {messages.map((msg) => (
                 <MessageBubble key={msg.id} msg={msg} />
               ))}
               {otherTyping && (
-                <div className="flex justify-start">
-                  <div className="bg-surface-raised rounded-2xl rounded-bl-sm px-4 py-2.5 flex gap-1">
+                <div className="flex justify-start mt-2">
+                  <div className="bg-white/10 backdrop-blur rounded-[20px] rounded-bl-sm px-4 py-3 flex gap-1.5 shadow-glass">
                     {[0, 1, 2].map((i) => (
-                      <span key={i} className="h-1.5 w-1.5 bg-white/50 rounded-full animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
+                      <span key={i} className="h-1.5 w-1.5 bg-brand-400 rounded-full animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
                     ))}
                   </div>
                 </div>
@@ -384,23 +384,23 @@ export default function ChatRoomPage() {
 
       {/* Gift panel */}
       {showGifts && (
-        <div className="border-t border-surface-border bg-surface-raised p-3">
+        <div className="border-t border-white/10 bg-surface-raised/95 backdrop-blur-xl p-4">
           <div className="grid grid-cols-6 gap-2 mb-2">
-            {gifts.length === 0 && <p className="col-span-6 text-center text-white/40 text-xs py-2">No gifts available</p>}
+            {gifts.length === 0 && <p className="col-span-6 text-center text-white/40 text-xs py-2 font-medium">No gifts available</p>}
             {gifts.slice(0, 18).map((g) => (
               <button
                 key={g.id}
                 onClick={() => sendGift(g)}
-                className="flex flex-col items-center p-1.5 rounded-xl hover:bg-surface-overlay transition-colors"
+                className="flex flex-col items-center p-2 rounded-2xl hover:bg-white/5 active:scale-95 transition-all"
                 disabled={giftSending}
               >
                 {g.imageUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={mediaUrl(g.imageUrl)} alt={g.name} className="h-7 w-7 object-contain" />
+                  <img src={mediaUrl(g.imageUrl)} alt={g.name} className="h-8 w-8 object-contain drop-shadow-md" />
                 ) : (
-                  <span className="text-2xl">🎁</span>
+                  <span className="text-3xl drop-shadow-md">🎁</span>
                 )}
-                <span className="text-[9px] text-white/50 flex items-center gap-0.5 mt-0.5">
+                <span className="text-[9px] font-bold text-amber-400 bg-amber-400/10 px-1 py-0.5 rounded flex items-center gap-0.5 mt-1">
                   <CoinIcon size={8} /> {g.priceCoins}
                 </span>
               </button>
@@ -410,11 +410,11 @@ export default function ChatRoomPage() {
       )}
 
       {/* Input */}
-      <div className="px-3 py-2.5 bg-surface-raised/95 backdrop-blur border-t border-surface-border pb-[calc(env(safe-area-inset-bottom)+10px)]">
-        <div className="flex items-center gap-1.5">
+      <div className="px-3 pt-2 pb-safe bg-black/60 backdrop-blur-xl border-t border-white/5">
+        <div className="flex items-center gap-2 mb-2">
           <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={handleFile} />
-          <button className="p-2 text-white/60 hover:text-white" aria-label="Attach" onClick={() => fileRef.current?.click()}>
-            <PaperclipIcon />
+          <button className="p-2.5 text-white/50 hover:text-white transition-colors active:scale-95 bg-white/5 rounded-full" aria-label="Attach" onClick={() => fileRef.current?.click()}>
+            <PaperclipIcon size={20} />
           </button>
           <input
             value={input}
@@ -423,19 +423,24 @@ export default function ChatRoomPage() {
               onTyping();
             }}
             onKeyDown={(e) => e.key === 'Enter' && send(input)}
-            placeholder="Type a message…"
-            className="flex-1 h-10 px-4 bg-surface-overlay rounded-full border border-surface-border text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-brand-500"
+            placeholder="Message..."
+            className="flex-1 h-12 px-5 bg-white/5 backdrop-blur-md rounded-full border border-white/10 text-white placeholder-white/30 focus:outline-none focus:border-brand-500/50 focus:bg-white/10 transition-all text-sm"
           />
           <button
             onClick={() => setShowGifts((s) => !s)}
-            className={`p-2 rounded-full ${showGifts ? 'bg-brand-600 text-white' : 'text-white/60 hover:text-white'}`}
+            className={`p-2.5 rounded-full transition-all active:scale-95 ${showGifts ? 'bg-brand-600 text-white shadow-glow' : 'bg-white/5 text-brand-300 hover:text-brand-200'}`}
             aria-label="Send gift"
           >
             <GiftQuickIcon />
           </button>
-          <Button size="icon" className="bg-brand-gradient" onClick={() => send(input)} disabled={!input.trim()} aria-label="Send">
-            <SendIcon size={18} />
-          </Button>
+          <button
+            className={`h-12 w-12 rounded-full flex items-center justify-center transition-all active:scale-[0.9] shadow-glow ${input.trim() ? 'bg-brand-gradient text-white hover:shadow-glow-pink cursor-pointer' : 'bg-white/5 text-white/30 cursor-default opacity-50'}`}
+            onClick={() => send(input)}
+            disabled={!input.trim()}
+            aria-label="Send"
+          >
+            <SendIcon size={18} className="translate-x-[1px]" />
+          </button>
         </div>
       </div>
     </div>
@@ -447,10 +452,13 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
 
   if (msg.type === 'GIFT') {
     return (
-      <div className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
-        <div className={`max-w-[75%] px-3 py-2 rounded-2xl flex items-center gap-1 ${mine ? 'bg-gradient-to-r from-brand-700 to-pink-700' : 'bg-surface-raised'}`}>
-          <span className="text-2xl animate-heart-beat">🎁</span>
-          <span className="text-xs text-white/80">sent a gift</span>
+      <div className={`flex ${mine ? 'justify-end' : 'justify-start'} mt-3 mb-3`}>
+        <div className={`px-4 py-3 rounded-[20px] flex items-center gap-2 shadow-float border ${mine ? 'bg-gradient-to-r from-brand-600 to-pink-600 border-white/20' : 'bg-surface-raised border-white/5'}`}>
+          <span className="text-3xl animate-heart-beat drop-shadow-md">🎁</span>
+          <div>
+            <span className="text-xs text-white/80 font-medium">Sent a gift</span>
+            <p className="font-bold text-sm">{msg.content}</p>
+          </div>
         </div>
       </div>
     );
@@ -458,32 +466,32 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
 
   if (msg.type === 'SYSTEM') {
     return (
-      <div className="flex justify-center my-1">
-        <span className="text-[10px] px-2.5 py-1 rounded-full bg-surface-overlay text-white/40">Message removed</span>
+      <div className="flex justify-center my-3">
+        <span className="text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full bg-white/5 border border-white/10 text-white/30">Message removed</span>
       </div>
     );
   }
 
   return (
-    <div className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
-      <div className={`max-w-[75%] px-3.5 py-2 rounded-2xl text-sm leading-relaxed ${mine ? 'bg-gradient-to-r from-brand-700 to-pink-700 rounded-br-sm' : 'bg-surface-raised border border-surface-border rounded-bl-sm'}`}>
+    <div className={`flex ${mine ? 'justify-end' : 'justify-start'} group`}>
+      <div className={`max-w-[80%] px-4 py-2.5 rounded-[22px] text-sm leading-relaxed shadow-sm border ${mine ? 'bg-brand-600 border-brand-500 rounded-br-md text-white' : 'glass border-white/10 rounded-bl-md text-white/90'}`}>
         {msg.type === 'IMAGE' && msg.mediaUrl && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={mediaUrl(msg.mediaUrl)} alt="attachment" className="max-w-[220px] rounded-lg mb-1" />
+          <img src={mediaUrl(msg.mediaUrl)} alt="attachment" className="max-w-[220px] rounded-xl mb-2 object-cover border border-white/10" />
         )}
-        {msg.type === 'VOICE' && msg.mediaUrl && <audio controls src={mediaUrl(msg.mediaUrl)} className="w-52 h-9" />}
-        {msg.content && <div>{msg.content}</div>}
+        {msg.type === 'VOICE' && msg.mediaUrl && <audio controls src={mediaUrl(msg.mediaUrl)} className="w-56 h-10 mb-1" />}
+        {msg.content && <div className="break-words">{msg.content}</div>}
         {Object.keys(msg.reactions ?? {}).length > 0 && (
-          <div className="flex gap-1 mt-1 flex-wrap">
+          <div className="flex gap-1.5 mt-2 flex-wrap">
             {Object.entries(msg.reactions).map(([emoji, users]) => (
-              <span key={emoji} className="text-[10px] px-2 py-0.5 rounded-full bg-black/30">
-                {emoji} {users.length}
+              <span key={emoji} className="text-[11px] px-2 py-0.5 rounded-full bg-black/40 border border-white/10 font-medium flex items-center gap-1">
+                {emoji} <span className="text-white/50">{users.length}</span>
               </span>
             ))}
           </div>
         )}
-        <div className={`mt-0.5 flex items-center justify-end gap-1 ${mine ? 'text-white/50' : 'text-white/30'}`}>
-          <span className="text-[10px]">{fmtTime(msg.createdAt)}</span>
+        <div className={`mt-1 flex items-center justify-end gap-1.5 ${mine ? 'text-white/60' : 'text-white/40'}`}>
+          <span className="text-[9px] font-bold tracking-wider">{fmtTime(msg.createdAt)}</span>
           {mine && <StatusIcon status={msg.status} />}
         </div>
       </div>

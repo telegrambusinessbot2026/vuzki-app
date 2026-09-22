@@ -545,36 +545,40 @@ export default function CallScreen() {
   const callActive = callState === 'connecting' || callState === 'connected';
 
   return (
-    <div className="fixed inset-0 z-50 bg-surface flex flex-col">
+    <div className="fixed inset-0 z-50 bg-[#0a0a0c] flex flex-col">
       {/* Remote / background */}
-      <div className="flex-1 relative">
+      <div className="flex-1 relative overflow-hidden">
         {type === 'VIDEO' && callActive ? (
-          <div className="absolute inset-0 bg-black/80">
-            <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-black/60" />
+          <div className="absolute inset-0 bg-black">
+            <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-cover transition-opacity duration-1000" />
+            <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/80" />
           </div>
         ) : (
           <div className="absolute inset-0 flex items-center justify-center">
             <audio ref={remoteAudioRef} autoPlay playsInline className="hidden" />
-            <div className="text-center">
-              <Avatar src={avatarUrl} name={displayName} size="2xl" online />
-              <h1 className="text-2xl font-bold mt-4">{displayName}</h1>
-              <p className="text-white/50 mt-1 text-sm">{statusLabel[callState]}</p>
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(139,92,246,0.15),transparent_60%)] animate-pulse-glow" />
+            <div className="text-center relative z-10">
+              <div className="relative inline-block mb-6">
+                 <Avatar src={avatarUrl} name={displayName} size="2xl" online />
+                 {callState === 'connecting' && <div className="absolute inset-0 rounded-full border-2 border-brand-400 animate-ping opacity-20" />}
+              </div>
+              <h1 className="text-3xl font-extrabold tracking-tight text-white drop-shadow-md">{displayName}</h1>
+              <p className="text-brand-300 font-medium mt-2 text-sm uppercase tracking-widest">{statusLabel[callState]}</p>
             </div>
           </div>
         )}
 
         {/* Video top overlay */}
         {type === 'VIDEO' && callActive && (
-          <div className="absolute top-0 inset-x-0 p-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
+          <div className="absolute top-0 inset-x-0 pt-safe px-4 py-4 flex items-center justify-between z-20">
+            <div className="flex items-center gap-3 bg-black/20 backdrop-blur-md rounded-full pr-4 p-1 border border-white/10 shadow-glass">
               <Avatar src={avatarUrl} name={displayName} size="sm" online />
               <div>
-                <p className="font-semibold">{displayName}</p>
-                <p className="text-xs text-white/70">{callState === 'connected' ? fmt(seconds) : 'Connecting…'}</p>
+                <p className="font-bold text-sm leading-none">{displayName}</p>
+                <p className="text-[10px] text-white/70 mt-1 uppercase tracking-widest font-bold">{callState === 'connected' ? fmt(seconds) : 'Connecting'}</p>
               </div>
             </div>
-            <button onClick={swapCamera} className="p-2 rounded-full bg-white/10 backdrop-blur border border-white/20 text-white" aria-label="Swap camera">
+            <button onClick={swapCamera} className="h-10 w-10 flex items-center justify-center rounded-full bg-black/20 backdrop-blur-md border border-white/10 text-white shadow-glass active:scale-90 transition-transform" aria-label="Swap camera">
               <VideoIcon size={18} />
             </button>
           </div>
@@ -582,42 +586,34 @@ export default function CallScreen() {
 
         {/* Self video mini */}
         {type === 'VIDEO' && camOn && callActive && (
-          <div className="absolute bottom-24 right-4 h-40 w-28 rounded-2xl overflow-hidden border-2 border-white/30 shadow-2xl bg-black">
+          <div className="absolute bottom-40 right-4 h-48 w-32 rounded-[20px] overflow-hidden border border-white/20 shadow-float bg-black z-20">
             <video ref={localVideoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
-            <div className="absolute bottom-1 right-1 text-[9px] text-white/70 bg-black/40 rounded px-1">You</div>
+            <div className="absolute bottom-1.5 right-1.5 text-[9px] text-white/90 font-bold bg-black/40 backdrop-blur rounded px-1.5 py-0.5">You</div>
           </div>
         )}
 
         {/* Gifts toast */}
         {giftsToast && (
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full bg-brand-600 text-white text-sm font-medium shadow-lg">
+          <div className="absolute top-20 left-1/2 -translate-x-1/2 px-5 py-2.5 rounded-full bg-brand-600/90 backdrop-blur-md text-white text-sm font-bold shadow-glow border border-brand-400/50 z-50 animate-slide-up">
             {giftsToast}
           </div>
         )}
 
-        {/* Autoplay-blocked fallback: the browser refused to start remote audio
-            on its own, so offer a user-gesture action. Never bypass the
-            browser security restriction. */}
+        {/* Autoplay-blocked fallback */}
         {callActive && audioBlocked && (
           <button
             onClick={() => {
               if (remoteAudioRef.current) {
-                remoteAudioRef.current
-                  .play()
-                  .then(() => setAudioBlocked(false))
-                  .catch(() => {});
+                remoteAudioRef.current.play().then(() => setAudioBlocked(false)).catch(() => {});
               }
               if (type === 'VIDEO' && remoteVideoRef.current) {
-                remoteVideoRef.current
-                  .play()
-                  .then(() => setAudioBlocked(false))
-                  .catch(() => {});
+                remoteVideoRef.current.play().then(() => setAudioBlocked(false)).catch(() => {});
               }
             }}
-            className="absolute inset-0 z-30 flex items-center justify-center bg-black/40"
+            className="absolute inset-0 z-30 flex items-center justify-center bg-black/60 backdrop-blur-sm"
             aria-label="Unmute remote audio"
           >
-            <span className="px-6 py-3 rounded-full bg-brand-600 text-white font-semibold text-sm shadow-xl animate-pulse">
+            <span className="px-6 py-3 rounded-full bg-brand-600 text-white font-bold text-sm shadow-glow animate-pulse">
               Tap to hear audio
             </span>
           </button>
@@ -626,123 +622,108 @@ export default function CallScreen() {
 
       {/* In-call gift picker */}
       {showGifts && !isEndState && (
-        <div className="absolute inset-x-0 bottom-0 z-20 bg-surface-raised border-t border-surface-border p-3 rounded-t-3xl">
-          <div className="grid grid-cols-6 gap-2">
-            {gifts.slice(0, 12).map((g) => (
-              <button key={g.id} onClick={() => sendGift(g)} className="flex flex-col items-center p-1.5 rounded-xl hover:bg-surface-overlay active:scale-95 transition-all">
+        <div className="absolute inset-x-0 bottom-[100px] z-20 mx-4 bg-surface-raised/95 backdrop-blur-xl border border-white/10 p-4 rounded-3xl shadow-float animate-slide-up">
+          <div className="grid grid-cols-4 gap-3">
+            {gifts.slice(0, 8).map((g) => (
+              <button key={g.id} onClick={() => sendGift(g)} className="flex flex-col items-center p-2 rounded-2xl bg-white/5 border border-white/5 hover:border-brand-500/50 active:scale-95 transition-all">
                 {g.imageUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={`${API_ORIGIN}${g.imageUrl}`} alt={g.name} className="h-7 w-7 object-contain" />
+                  <img src={`${API_ORIGIN}${g.imageUrl}`} alt={g.name} className="h-10 w-10 object-contain drop-shadow-md" />
                 ) : (
-                  <span className="text-2xl">🎁</span>
+                  <span className="text-3xl drop-shadow-md">🎁</span>
                 )}
-                <span className="text-[9px] text-white/50 flex items-center gap-0.5"><CoinIcon size={8} />{g.priceCoins}</span>
+                <span className="text-[10px] text-amber-400 font-bold flex items-center gap-1 mt-1 bg-amber-400/10 px-1.5 py-0.5 rounded"><CoinIcon size={8} />{g.priceCoins}</span>
               </button>
             ))}
           </div>
-          <button onClick={() => setShowGifts(false)} className="mt-2 w-full h-9 rounded-xl bg-brand-600 text-white text-sm font-semibold">Close</button>
+          <button onClick={() => setShowGifts(false)} className="mt-3 w-full h-10 rounded-xl bg-white/10 text-white text-xs font-bold active:scale-[0.98]">Close</button>
         </div>
       )}
 
       {/* Controls */}
       {isEndState ? (
-        <div className="absolute bottom-0 inset-x-0 pb-[calc(env(safe-area-inset-bottom)+24px)] px-6">
-          <div className="flex flex-col items-center">
-            <p className="text-sm text-white/60 mb-4">{statusLabel[callState]}</p>
+        <div className="absolute bottom-0 inset-x-0 pb-safe px-6 pt-10 bg-gradient-to-t from-[#0a0a0c] to-transparent">
+          <div className="flex flex-col items-center pb-6">
+            <p className="text-sm font-medium text-white/70 mb-5">{statusLabel[callState]}</p>
             {callState === 'insufficient' && (
-              <p className="text-sm text-amber-400/90 mb-4">
+              <p className="text-xs font-medium text-amber-400/90 mb-5 text-center bg-amber-400/10 p-3 rounded-xl border border-amber-400/20">
                 {insufficientDetails?.required
                   ? `You need at least ${insufficientDetails.required} coins to start this call. `
                   : 'Add coins to your wallet to start calls. '}
                 Top up below.
               </p>
             )}
-            <div className="flex gap-3">
+            <div className="flex w-full gap-3">
               {callState === 'insufficient' ? (
-                <Link href="/app/wallet" className="h-14 px-6 rounded-full bg-brand-600 text-white flex items-center justify-center text-sm font-semibold active:scale-90 transition-transform">
+                <Link href="/app/wallet" className="flex-1 h-14 rounded-2xl bg-brand-gradient text-white flex items-center justify-center text-sm font-bold shadow-glow active:scale-[0.98] transition-transform">
                   Top up coins
                 </Link>
               ) : (
-                <Link href={`/app/chat/${id}`} className="h-14 px-6 rounded-full bg-brand-600 text-white flex items-center justify-center text-sm font-semibold active:scale-90 transition-transform">
+                <Link href={`/app/chat/${id}`} className="flex-1 h-14 rounded-2xl bg-brand-600 text-white flex items-center justify-center text-sm font-bold shadow-glow active:scale-[0.98] transition-transform">
                   Message
                 </Link>
               )}
-              <Link href={`/app/call/${id}?type=${type.toLowerCase()}`} className="h-14 px-6 rounded-full bg-white/10 backdrop-blur border border-white/20 text-white flex items-center justify-center text-sm font-semibold active:scale-90 transition-transform">
+              <Link href={`/app/call/${id}?type=${type.toLowerCase()}`} className="flex-1 h-14 rounded-2xl bg-white/10 backdrop-blur-md border border-white/10 text-white flex items-center justify-center text-sm font-bold active:scale-[0.98] transition-transform hover:bg-white/15">
                 Call again
               </Link>
             </div>
-            <button onClick={() => { window.history.length > 1 ? window.history.back() : (window.location.href = '/app/chat'); }} className="mt-4 text-xs text-white/50 hover:text-white">
+            <button onClick={() => { window.history.length > 1 ? window.history.back() : (window.location.href = '/app/chat'); }} className="mt-5 text-[11px] uppercase tracking-wider font-bold text-white/40 hover:text-white transition-colors">
               Close
             </button>
           </div>
         </div>
       ) : (
-        <div className="absolute bottom-0 inset-x-0 pb-[calc(env(safe-area-inset-bottom)+24px)]">
-          {type === 'VIDEO' && (
-            <div className="flex justify-center gap-3 mb-6">
-              {[
-                { label: 'Gift', icon: <GiftIcon />, onClick: () => setShowGifts((s) => !s) },
-                { label: 'Speaker', icon: <SpeakerIcon />, onClick: () => setSpeakerOn((v) => !v) },
-                { label: 'Report', icon: <FlagIcon />, onClick: report },
-              ].map((b, i) => (
-                <button key={i} onClick={b.onClick} className="h-12 w-12 rounded-full bg-white/10 backdrop-blur border border-white/20 flex items-center justify-center active:scale-90 transition-transform" aria-label={b.label}>
-                  {b.icon}
-                </button>
-              ))}
-            </div>
-          )}
-          <div className="flex items-center justify-center gap-5">
-            <button
-              onClick={toggleMic}
-              className={`h-14 w-14 rounded-full flex items-center justify-center transition-transform active:scale-90 ${micOn ? 'bg-white/10 backdrop-blur border border-white/20' : 'bg-red-500'}`}
-              aria-label="Toggle microphone"
-            >
-              {micOn ? <MicIcon /> : <MicOffIcon />}
-            </button>
-            {type === 'VIDEO' && (
+        <div className="absolute bottom-0 inset-x-0 pb-safe pt-24 bg-gradient-to-t from-[#0a0a0c] via-[#0a0a0c]/80 to-transparent">
+          <div className="flex flex-col items-center pb-6">
+            <div className="flex items-center justify-center gap-4 bg-white/5 backdrop-blur-xl border border-white/10 p-2 rounded-full shadow-glass mb-4">
               <button
-                onClick={toggleCam}
-                className={`h-14 w-14 rounded-full flex items-center justify-center transition-transform active:scale-90 ${camOn ? 'bg-white/10 backdrop-blur border border-white/20' : 'bg-red-500'}`}
-                aria-label="Toggle camera"
+                onClick={toggleMic}
+                className={`h-12 w-12 rounded-full flex items-center justify-center transition-all active:scale-90 ${micOn ? 'bg-transparent text-white hover:bg-white/10' : 'bg-white text-black shadow-glow'}`}
+                aria-label="Toggle microphone"
               >
-                {camOn ? <VideoIcon /> : <CameraOffIcon />}
+                {micOn ? <MicIcon size={20} /> : <MicOffIcon size={20} />}
               </button>
-            )}
-            <button
-              onClick={() => setSpeakerOn((v) => !v)}
-              className="h-14 w-14 rounded-full bg-white/10 backdrop-blur border border-white/20 flex items-center justify-center active:scale-90"
-              aria-label="Toggle speaker"
-            >
-              {speakerOn ? <SpeakerIcon /> : <SpeakerMutedIcon />}
-            </button>
-            {type !== 'VIDEO' && (
-              <>
+              {type === 'VIDEO' && (
                 <button
-                  onClick={() => setShowGifts((s) => !s)}
-                  className="h-14 w-14 rounded-full bg-white/10 backdrop-blur border border-white/20 flex items-center justify-center active:scale-90"
-                  aria-label="Gift"
+                  onClick={toggleCam}
+                  className={`h-12 w-12 rounded-full flex items-center justify-center transition-all active:scale-90 ${camOn ? 'bg-transparent text-white hover:bg-white/10' : 'bg-white text-black shadow-glow'}`}
+                  aria-label="Toggle camera"
                 >
-                  <GiftIcon />
+                  {camOn ? <VideoIcon size={20} /> : <CameraOffIcon size={20} />}
                 </button>
-                <button
-                  onClick={report}
-                  className="h-14 w-14 rounded-full bg-white/10 backdrop-blur border border-white/20 flex items-center justify-center active:scale-90"
-                  aria-label="Report"
-                >
-                  <FlagIcon />
-                </button>
-              </>
+              )}
+              <button
+                onClick={() => setSpeakerOn((v) => !v)}
+                className={`h-12 w-12 rounded-full flex items-center justify-center transition-all active:scale-90 ${speakerOn ? 'bg-transparent text-white hover:bg-white/10' : 'bg-white text-black'}`}
+                aria-label="Toggle speaker"
+              >
+                {speakerOn ? <SpeakerIcon size={20} /> : <SpeakerMutedIcon />}
+              </button>
+              {type !== 'VIDEO' && (
+                <>
+                  <button
+                    onClick={() => setShowGifts((s) => !s)}
+                    className="h-12 w-12 rounded-full flex items-center justify-center transition-all active:scale-90 bg-transparent text-white hover:bg-white/10"
+                    aria-label="Gift"
+                  >
+                    <GiftIcon size={20} />
+                  </button>
+                </>
+              )}
+              <button
+                onClick={endCall}
+                className="h-14 w-14 rounded-full bg-red-500 text-white flex items-center justify-center shadow-glow active:scale-90 transition-transform ml-2"
+                aria-label="End call"
+              >
+                <CloseIcon size={24} />
+              </button>
+            </div>
+            {type === 'VIDEO' && (
+               <div className="flex gap-6 mb-2">
+                 <button onClick={() => setShowGifts((s) => !s)} className="text-[10px] uppercase tracking-widest font-bold text-white/60 hover:text-white flex items-center gap-1.5"><GiftIcon size={12} /> Gift</button>
+                 <button onClick={report} className="text-[10px] uppercase tracking-widest font-bold text-white/60 hover:text-white flex items-center gap-1.5"><FlagIcon size={12} /> Report</button>
+               </div>
             )}
-            <button
-              onClick={endCall}
-              className="h-16 w-16 rounded-full bg-red-600 flex items-center justify-center shadow-lg active:scale-90 transition-transform"
-              aria-label="End call"
-            >
-              <CloseIcon />
-            </button>
-          </div>
-          <div className="text-center mt-5 text-[11px] text-white/50">
-            {callState === 'connecting' ? 'Calling…' : callState === 'connected' ? 'Tap end to hang up' : statusLabel[callState]}
           </div>
         </div>
       )}
