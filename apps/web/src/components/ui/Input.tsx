@@ -5,10 +5,10 @@ interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, '
   error?: string;
   hint?: string;
   prefix?: React.ReactNode;
-  withPrefix?: boolean;
+  suffix?: React.ReactNode;
 }
 
-export function Input({ label, error, hint, prefix, className = '', id, ...props }: InputProps) {
+export function Input({ label, error, hint, prefix, suffix, className = '', id, ...props }: InputProps) {
   const inputId = id || (label ? label.toLowerCase().replace(/\s+/g, '-') : undefined);
   return (
     <div className="w-full">
@@ -17,19 +17,21 @@ export function Input({ label, error, hint, prefix, className = '', id, ...props
           {label}
         </label>
       )}
-      <div className="relative">
-        {prefix && <div className="absolute left-3 top-1/2 -translate-y-1/2 text-white/50">{prefix}</div>}
+      <div className="relative flex items-center">
+        {prefix && <div className="absolute left-4 text-white/50">{prefix}</div>}
         <input
           id={inputId}
           className={[
-            'w-full h-12 px-4 bg-surface-raised border rounded-2xl text-white placeholder-white/30',
+            'w-full h-[52px] px-4 bg-surface-raised border rounded-2xl text-white placeholder-white/30',
             'focus:outline-none focus:bg-surface-overlay transition-all',
-            prefix ? 'pl-10' : '',
-            error ? 'border-red-500' : 'border-transparent',
+            prefix ? 'pl-12' : '',
+            suffix ? 'pr-12' : '',
+            error ? 'border-red-500' : 'border-surface-border',
             className,
           ].join(' ')}
           {...props}
         />
+        {suffix && <div className="absolute right-4 text-white/50">{suffix}</div>}
       </div>
       {error ? (
         <p className="mt-1 text-sm text-red-400">{error}</p>
@@ -50,7 +52,7 @@ export function TextArea({ label, error, className = '', ...props }: React.Texta
         className={[
           'w-full px-4 py-3 bg-surface-raised border rounded-2xl text-white placeholder-white/30',
           'focus:outline-none focus:bg-surface-overlay transition-all',
-          error ? 'border-red-500' : 'border-transparent',
+          error ? 'border-red-500' : 'border-surface-border',
           className,
         ].join(' ')}
         {...props}
@@ -63,17 +65,20 @@ export function TextArea({ label, error, className = '', ...props }: React.Texta
 export function PasswordInput(props: Omit<InputProps, 'type'>) {
   const [visible, setVisible] = React.useState(false);
   return (
-    <div className="relative">
-      <Input {...props} type={visible ? 'text' : 'password'} />
-      <button
-        type="button"
-        onClick={() => setVisible((v) => !v)}
-        className="absolute right-3 top-[42px] text-white/50 hover:text-white"
-        aria-label={visible ? 'Hide password' : 'Show password'}
-      >
-        {visible ? <EyeOffIcon /> : <EyeIcon />}
-      </button>
-    </div>
+    <Input
+      {...props}
+      type={visible ? 'text' : 'password'}
+      suffix={
+        <button
+          type="button"
+          onClick={() => setVisible((v) => !v)}
+          className="text-white/50 hover:text-white flex items-center justify-center"
+          aria-label={visible ? 'Hide password' : 'Show password'}
+        >
+          {visible ? <EyeOffIcon /> : <EyeIcon />}
+        </button>
+      }
+    />
   );
 }
 

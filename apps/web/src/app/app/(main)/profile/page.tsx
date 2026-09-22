@@ -3,168 +3,173 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
-import { api } from '@/lib/api';
-import { Avatar, PremiumBadge, CreatorBadge, VerifiedIcon } from '@/components/ui/Avatar';
-import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
-import { SettingsIcon, WalletIcon, CoinIcon, ChevronRightIcon, PhoneIcon, VideoIcon } from '@/components/ui/Icons';
+import { Avatar, VerifiedIcon } from '@/components/ui/Avatar';
 import { Spinner } from '@/components/ui/Button';
-
-interface CallHistoryItem {
-  id: string;
-  other: { id: string; displayName: string; username: string; avatarUrl: string | null; isVerified: boolean };
-  type: 'AUDIO' | 'VIDEO';
-  status: string;
-  role: 'CALLER' | 'RECEIVER';
-  startedAt: string | null;
-  endedAt: string | null;
-  durationSeconds: number;
-  costCoins: number;
-}
-
-function callTime(iso: string | null | undefined): string {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
-}
+import { SettingsIcon, ChevronRightIcon } from '@/components/ui/Icons';
 
 export default function ProfilePage() {
   const { user } = useAuth();
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Spinner className="h-6 w-6 text-white/50" />
+      <div className="min-h-screen flex items-center justify-center bg-[#0a0a0c]">
+        <Spinner className="h-6 w-6 text-[#FF4DBD]" />
       </div>
     );
   }
 
-  const [history, setHistory] = useState<CallHistoryItem[]>([]);
-  const [historyLoading, setHistoryLoading] = useState(true);
-  const [stats, setStats] = useState<{ followers: number; following: number; profileViews: number } | null>(null);
-
-  useEffect(() => {
-    api<{ items: CallHistoryItem[] }>('/calls/history', { auth: true })
-      .then((d) => setHistory(d.items ?? []))
-      .catch(() => setHistory([]))
-      .finally(() => setHistoryLoading(false));
-  }, []);
-
-  useEffect(() => {
-    api<{ user: { followers: number; following: number; profileViews: number } }>('/users/me/profile', { auth: true })
-      .then((d) => setStats({ followers: d.user.followers, following: d.user.following, profileViews: d.user.profileViews }))
-      .catch(() => setStats({ followers: 0, following: 0, profileViews: 0 }));
-  }, []);
-
-  const statRows = [
-    { label: 'Followers', value: stats ? stats.followers.toLocaleString() : '…' },
-    { label: 'Following', value: stats ? stats.following.toLocaleString() : '…' },
-    { label: 'Views', value: stats ? stats.profileViews.toLocaleString() : '…' },
+  const listLinks = [
+    { label: 'Account', href: '/app/settings/account' },
+    { label: 'Privacy', href: '/app/settings/privacy' },
+    { label: 'Notifications', href: '/app/settings/notifications' },
+    { label: 'Safety', href: '/app/safety' },
+    { label: 'Help Center', href: '/safety' },
   ];
 
   return (
-    <div className="px-4 pt-4 pb-4">
-      <header className="flex items-center justify-between mb-4">
-        <div>
-          <h1 className="text-xl font-bold">My Profile</h1>
+    <div className="flex flex-col min-h-dvh bg-[#0a0a0c] text-white overflow-y-auto pb-20">
+      {/* Header */}
+      <header className="flex items-center justify-between px-4 pt-6 pb-4">
+        <div className="flex items-center gap-2">
+          <div className="text-[#FF4DBD]">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+          </div>
+          <span className="text-xl font-bold tracking-tight">VUZKI</span>
         </div>
-        <Link href="/app/settings" className="p-2 rounded-full bg-surface-overlay border border-surface-border text-white/70 hover:text-white">
-          <SettingsIcon />
+        <Link href="/app/settings" className="p-2 text-white/80 hover:text-white">
+          <SettingsIcon size={24} />
         </Link>
       </header>
 
-      <div className="relative rounded-3xl overflow-hidden bg-brand-gradient-soft border border-surface-border mb-5">
-        <div className="absolute inset-0 bg-gradient-to-br from-brand-700/40 via-transparent to-pink-600/40" />
-        <div className="relative p-5 flex flex-col items-center pt-10">
-          <Avatar src={user.avatarUrl} name={user.displayName} size="2xl" online verified={user.isVerified} className="mb-3 ring-4 ring-surface" />
-          <div className="flex items-center gap-2">
-            <h2 className="text-xl font-bold">{user.displayName}</h2>
-            {user.isVerified && <VerifiedIcon size={16} />}
-            {user.isPremium && <PremiumBadge tier={user.premiumTier || 'PREMIUM'} />}
-          </div>
-          <p className="text-white/60 text-sm mt-0.5">@{user.username}</p>
-          {user.isCreator && <div className="mt-2"><CreatorBadge /></div>}
-
-          <div className="grid grid-cols-3 gap-6 mt-5 w-full max-w-xs">
-            {statRows.map((s) => (
-              <div key={s.label} className="text-center">
-                <p className="font-bold text-lg">{s.value}</p>
-                <p className="text-[11px] text-white/50">{s.label}</p>
+      {/* Main Profile Area */}
+      <div className="px-4 mt-2">
+        <div className="flex gap-4">
+          <div className="shrink-0">
+            <div className="relative">
+              <div className="p-1 rounded-full bg-gradient-to-tr from-[#FF4DBD] to-[#A855F7]">
+                <Avatar src={user.avatarUrl} name={user.displayName} size="2xl" className="w-24 h-24 border-[3px] border-[#0a0a0c]" />
               </div>
-            ))}
+            </div>
           </div>
+          
+          <div className="flex-1 min-w-0 py-1">
+            <div className="flex items-center gap-1.5 mb-1">
+              <h2 className="text-xl font-bold truncate">{user.displayName}, 24</h2>
+              {user.isVerified && <VerifiedIcon size={16} />}
+            </div>
+            
+            <p className="text-sm text-white/60 mb-2">@{user.username}</p>
+            
+            <div className="flex items-center gap-1.5 text-xs text-white/80 mb-2">
+              <span className="w-2 h-2 rounded-full bg-green-500" />
+              <span>Online now</span>
+            </div>
+            
+            <div className="flex items-center gap-1 text-xs text-white/60 mb-3">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              <span>New York • 2.5 km away</span>
+            </div>
+          </div>
+        </div>
 
-          <div className="flex gap-2.5 mt-5 w-full">
-            <Link href="/app/settings/profile" className="flex-1">
-              <Button variant="gradient" size="md" full>Edit Profile</Button>
-            </Link>
+        <p className="text-sm text-white/80 mt-2 mb-4 leading-relaxed">
+          {user.bio || 'Love traveling, coffee, and good conversations. Swipe right if you want to grab a drink! ☕✨'}
+        </p>
+
+        <Link href="/app/settings/profile" className="block w-full">
+          <button className="w-full py-2.5 rounded-full bg-white/10 text-white font-semibold text-sm hover:bg-white/15 transition-colors">
+            Edit Profile
+          </button>
+        </Link>
+
+        {/* Stats Row */}
+        <div className="flex items-center justify-between mt-6 px-2">
+          <div className="text-center">
+            <p className="font-bold text-lg">—</p>
+            <p className="text-xs text-white/50 mt-0.5">Likes</p>
+          </div>
+          <div className="w-px h-8 bg-white/10" />
+          <div className="text-center">
+            <p className="font-bold text-lg">—</p>
+            <p className="text-xs text-white/50 mt-0.5">Matches</p>
+          </div>
+          <div className="w-px h-8 bg-white/10" />
+          <div className="text-center">
+            <p className="font-bold text-lg">—</p>
+            <p className="text-xs text-white/50 mt-0.5">Following</p>
+          </div>
+          <div className="w-px h-8 bg-white/10" />
+          <div className="text-center">
+            <p className="font-bold text-lg">—</p>
+            <p className="text-xs text-white/50 mt-0.5">Profile Views</p>
           </div>
         </div>
       </div>
 
-      <Card className="p-4 mb-4">
-        <h3 className="font-semibold mb-1.5">Bio</h3>
-        <p className="text-sm text-white/60 leading-relaxed">{user.bio || 'No bio yet — say something about yourself!'}</p>
-        <div className="flex flex-wrap gap-2 mt-3">
-          {user.interests?.length ? (
-            user.interests.map((it) => (
-              <span key={it} className="text-[11px] px-3 py-1 rounded-full bg-surface-overlay border border-surface-border text-white/70">{it}</span>
-            ))
-          ) : (
-            <span className="text-[11px] text-white/40">Add interests to get better matches</span>
-          )}
-        </div>
-      </Card>
-
-      <Link href="/app/wallet">
-        <Card interactive className="p-4 mb-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="h-11 w-11 rounded-xl bg-amber-500/15 text-amber-400 flex items-center justify-center">
-              <WalletIcon size={20} />
+      {/* Photos */}
+      <div className="mt-8">
+        <h3 className="px-4 font-bold mb-3">Photos</h3>
+        <div className="flex gap-3 overflow-x-auto px-4 pb-2 custom-scrollbar">
+          {[1,2,3,4].map(i => (
+            <div key={i} className="w-28 h-36 shrink-0 rounded-2xl bg-white/5 overflow-hidden">
+              <img src={user.avatarUrl || `https://i.pravatar.cc/150?img=${i}`} alt="Photo" className="w-full h-full object-cover" />
             </div>
-            <div>
-              <p className="text-sm text-white/60">Balance</p>
-              <p className="flex items-center gap-1 font-bold text-amber-400">
-                <CoinIcon size={16} /> {user.wallet?.balance?.toLocaleString() ?? '0'} coins
-              </p>
+          ))}
+          <div className="w-28 h-36 shrink-0 rounded-2xl bg-white/5 border border-dashed border-white/20 flex flex-col items-center justify-center gap-2 text-white/50">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14"/></svg>
+            <span className="text-xs font-medium">Add Photo</span>
+          </div>
+        </div>
+      </div>
+
+      {/* About Me */}
+      <div className="px-4 mt-6">
+        <div className="bg-[#141416] rounded-2xl p-4">
+          <h3 className="font-bold mb-3">About Me</h3>
+          <div className="grid grid-cols-2 gap-y-3 gap-x-4">
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-white/40">📏</span>
+              <span>170 cm (5'7")</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-white/40">🎓</span>
+              <span>Bachelors Degree</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-white/40">💼</span>
+              <span>Designer</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-white/40">🍷</span>
+              <span>Socially</span>
             </div>
           </div>
-          <div className="flex items-center gap-1 text-right">
-            <span className="text-xs text-brand-400 font-semibold">Top Up</span>
-            <ChevronRightIcon size={16} className="text-white/40" />
-          </div>
-        </Card>
-      </Link>
-
-      {/* Recent calls */}
-      <Card className="p-4 mb-4">
-        <h3 className="font-semibold mb-3">Recent Calls</h3>
-        {historyLoading && <div className="py-4 flex justify-center"><Spinner className="h-5 w-5 text-white/40" /></div>}
-        {!historyLoading && history.length === 0 && (
-          <p className="text-sm text-white/40 py-2">No calls yet — start one to see it here.</p>
-        )}
-        <div className="space-y-2.5">
-          {history.slice(0, 6).map((c) => {
-            const missed = c.status === 'MISSED' || c.status === 'REJECTED' || c.status === 'CANCELLED';
-            const duration = c.durationSeconds ? `${Math.floor(c.durationSeconds / 60)}m` : '—';
-            return (
-              <Link key={c.id} href={`/app/call/${c.other.id}?type=${c.type.toLowerCase()}`} className="flex items-center gap-3">
-                <Avatar src={c.other.avatarUrl} name={c.other.displayName} size="md" verified={c.other.isVerified} />
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-sm truncate">{c.other.displayName}</p>
-                  <p className="text-[11px] text-white/50 flex items-center gap-1">
-                    {c.type === 'VIDEO' ? <VideoIcon size={11} /> : <PhoneIcon size={11} />}
-                    {c.type === 'VIDEO' ? 'Video' : 'Audio'} · {duration} · {callTime(c.startedAt)}
-                  </p>
-                </div>
-                <span className={`text-[10px] px-2 py-0.5 rounded-full ${missed ? 'bg-red-500/15 text-red-400' : 'bg-green-500/15 text-green-400'}`}>
-                  {missed ? 'Missed' : 'Completed'}
-                </span>
-              </Link>
-            );
-          })}
         </div>
-      </Card>
+      </div>
+
+      {/* Interests */}
+      <div className="px-4 mt-4">
+        <div className="bg-[#141416] rounded-2xl p-4">
+          <h3 className="font-bold mb-3">Interests</h3>
+          <div className="flex flex-wrap gap-2">
+            {['Photography', 'Traveling', 'Coffee', 'Art', 'Music', 'Reading'].map(it => (
+              <span key={it} className="px-3 py-1.5 rounded-full bg-white/5 text-sm font-medium">
+                {it}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Links List */}
+      <div className="px-4 mt-6 space-y-1">
+        {listLinks.map((link, i) => (
+          <Link key={i} href={link.href} className="flex items-center justify-between p-4 rounded-xl hover:bg-white/5 transition-colors">
+            <span className="font-medium text-[15px]">{link.label}</span>
+            <ChevronRightIcon size={20} className="text-white/30" />
+          </Link>
+        ))}
+      </div>
     </div>
   );
 }

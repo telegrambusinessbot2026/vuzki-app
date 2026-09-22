@@ -551,50 +551,119 @@ export default function CallScreen() {
         {type === 'VIDEO' && callActive ? (
           <div className="absolute inset-0 bg-black">
             <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-cover transition-opacity duration-1000" />
-            <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/80" />
+            <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-[#0a0a0c]/90" />
           </div>
         ) : (
           <div className="absolute inset-0 flex items-center justify-center">
             <audio ref={remoteAudioRef} autoPlay playsInline className="hidden" />
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(139,92,246,0.15),transparent_60%)] animate-pulse-glow" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,77,189,0.15),transparent_60%)] animate-pulse-glow" />
             <div className="text-center relative z-10">
               <div className="relative inline-block mb-6">
                  <Avatar src={avatarUrl} name={displayName} size="2xl" online />
-                 {callState === 'connecting' && <div className="absolute inset-0 rounded-full border-2 border-brand-400 animate-ping opacity-20" />}
+                 {callState === 'connecting' && <div className="absolute inset-0 rounded-full border-2 border-[#FF4DBD] animate-ping opacity-30" />}
               </div>
               <h1 className="text-3xl font-extrabold tracking-tight text-white drop-shadow-md">{displayName}</h1>
-              <p className="text-brand-300 font-medium mt-2 text-sm uppercase tracking-widest">{statusLabel[callState]}</p>
+              <p className="text-[#FF4DBD] font-medium mt-2 text-sm uppercase tracking-widest">{statusLabel[callState]}</p>
             </div>
           </div>
         )}
 
-        {/* Video top overlay */}
-        {type === 'VIDEO' && callActive && (
-          <div className="absolute top-0 inset-x-0 pt-safe px-4 py-4 flex items-center justify-between z-20">
-            <div className="flex items-center gap-3 bg-black/20 backdrop-blur-md rounded-full pr-4 p-1 border border-white/10 shadow-glass">
-              <Avatar src={avatarUrl} name={displayName} size="sm" online />
+        {/* Top Header Overlay */}
+        {callActive && (
+          <div className="absolute top-0 inset-x-0 pt-safe-top px-4 py-4 flex items-center justify-between z-20">
+            <button onClick={() => window.history.back()} className="p-2 -ml-2 text-white/90 hover:text-white drop-shadow-md">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+            </button>
+            <div className="flex items-center">
+              <svg width="24" height="24" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" className="mr-2 drop-shadow-md">
+                <path d="M20 38C20 38 4 28 4 15C4 9.47715 8.47715 5 14 5C17.0678 5 19.8133 6.37923 21.6441 8.5684C23.0805 6.43851 25.5905 5 28.5 5C34.0228 5 38.5 9.47715 38.5 15C38.5 28 20 38 20 38Z" fill="url(#paint0_linear_logo_call)"/>
+                <defs>
+                  <linearGradient id="paint0_linear_logo_call" x1="4" y1="5" x2="38.5" y2="38" gradientUnits="userSpaceOnUse">
+                    <stop stopColor="#FF4DBD"/>
+                    <stop offset="1" stopColor="#A855F7"/>
+                  </linearGradient>
+                </defs>
+              </svg>
               <div>
-                <p className="font-bold text-sm leading-none">{displayName}</p>
-                <p className="text-[10px] text-white/70 mt-1 uppercase tracking-widest font-bold">{callState === 'connected' ? fmt(seconds) : 'Connecting'}</p>
+                <h1 className="text-sm font-black tracking-tight text-white leading-none drop-shadow-md">VUZKI</h1>
+                <p className="text-[6px] text-white/90 drop-shadow-md">Real People. Real Connections.</p>
               </div>
             </div>
-            <button onClick={swapCamera} className="h-10 w-10 flex items-center justify-center rounded-full bg-black/20 backdrop-blur-md border border-white/10 text-white shadow-glass active:scale-90 transition-transform" aria-label="Swap camera">
-              <VideoIcon size={18} />
-            </button>
+            <div className="flex items-center gap-3">
+              <button className="text-white drop-shadow-md p-1"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>
+              <div className="flex flex-col items-center">
+                <div className="h-6 w-6 rounded-full border border-white/40 flex items-center justify-center drop-shadow-md">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+                </div>
+                <span className="text-[7px] text-white/90 mt-0.5 drop-shadow-md font-medium">Secure Call</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Timer Pill */}
+        {callActive && (
+          <div className="absolute top-24 left-4 z-20">
+            <div className="flex items-center gap-2 bg-black/40 backdrop-blur-md rounded-full px-3 py-1.5 border border-white/10 shadow-glass">
+              <span className="h-2.5 w-2.5 rounded-full bg-red-500 animate-pulse"></span>
+              <span className="text-sm font-semibold text-white tracking-widest">{callState === 'connected' ? fmt(seconds) : '00:00'}</span>
+            </div>
           </div>
         )}
 
         {/* Self video mini */}
         {type === 'VIDEO' && camOn && callActive && (
-          <div className="absolute bottom-40 right-4 h-48 w-32 rounded-[20px] overflow-hidden border border-white/20 shadow-float bg-black z-20">
+          <div className="absolute top-24 right-4 h-[180px] w-[120px] rounded-2xl overflow-hidden border-2 border-white/10 shadow-float bg-black z-20">
             <video ref={localVideoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
-            <div className="absolute bottom-1.5 right-1.5 text-[9px] text-white/90 font-bold bg-black/40 backdrop-blur rounded px-1.5 py-0.5">You</div>
+          </div>
+        )}
+
+        {/* Right Floating Actions */}
+        {callActive && !isEndState && (
+          <div className="absolute bottom-36 right-4 flex flex-col items-center gap-4 z-20">
+            {type === 'VIDEO' && (
+              <>
+                <div className="flex flex-col items-center gap-1.5">
+                  <button onClick={swapCamera} className="h-12 w-12 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-white flex items-center justify-center shadow-glass active:scale-90 transition-transform">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+                  </button>
+                  <span className="text-[9px] text-white drop-shadow-md font-medium">Flip</span>
+                </div>
+                <div className="flex flex-col items-center gap-1.5">
+                  <button className="h-12 w-12 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-[#FF4DBD] flex items-center justify-center shadow-glass active:scale-90 transition-transform">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+                  </button>
+                  <span className="text-[9px] text-white drop-shadow-md font-medium">Effects</span>
+                </div>
+              </>
+            )}
+            <div className="flex flex-col items-center gap-1.5">
+              <button onClick={() => setShowGifts((s) => !s)} className="h-12 w-12 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-[#FF4DBD] flex items-center justify-center shadow-glass active:scale-90 transition-transform">
+                <GiftIcon size={22} />
+              </button>
+              <span className="text-[9px] text-white drop-shadow-md font-medium">Gift</span>
+            </div>
+          </div>
+        )}
+
+        {/* Bottom Left Info */}
+        {callActive && (
+          <div className="absolute bottom-36 left-4 z-20">
+            <h2 className="text-2xl font-bold text-white drop-shadow-md mb-1">{displayName}, {presetsName ? '24' : '22'}</h2>
+            <div className="flex items-center gap-1.5 mb-3">
+              <span className="w-2.5 h-2.5 rounded-full bg-green-500 shadow-glow"></span>
+              <span className="text-xs font-semibold text-white drop-shadow-md">Online now</span>
+            </div>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/40 backdrop-blur-md border border-white/10 shadow-glass">
+              <span className="text-[#FF4DBD]"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg></span>
+              <span className="text-xs font-medium text-white">Good Vibes Only ✨</span>
+            </div>
           </div>
         )}
 
         {/* Gifts toast */}
         {giftsToast && (
-          <div className="absolute top-20 left-1/2 -translate-x-1/2 px-5 py-2.5 rounded-full bg-brand-600/90 backdrop-blur-md text-white text-sm font-bold shadow-glow border border-brand-400/50 z-50 animate-slide-up">
+          <div className="absolute top-36 left-1/2 -translate-x-1/2 px-5 py-2.5 rounded-full bg-gradient-to-r from-[#FF4DBD] to-[#A855F7] text-white text-sm font-bold shadow-glow border border-white/20 z-50 animate-slide-up">
             {giftsToast}
           </div>
         )}
@@ -613,7 +682,7 @@ export default function CallScreen() {
             className="absolute inset-0 z-30 flex items-center justify-center bg-black/60 backdrop-blur-sm"
             aria-label="Unmute remote audio"
           >
-            <span className="px-6 py-3 rounded-full bg-brand-600 text-white font-bold text-sm shadow-glow animate-pulse">
+            <span className="px-6 py-3 rounded-full bg-[#FF4DBD] text-white font-bold text-sm shadow-glow animate-pulse">
               Tap to hear audio
             </span>
           </button>
@@ -622,10 +691,10 @@ export default function CallScreen() {
 
       {/* In-call gift picker */}
       {showGifts && !isEndState && (
-        <div className="absolute inset-x-0 bottom-[100px] z-20 mx-4 bg-surface-raised/95 backdrop-blur-xl border border-white/10 p-4 rounded-3xl shadow-float animate-slide-up">
+        <div className="absolute inset-x-0 bottom-[120px] z-20 mx-4 bg-[#16161D]/95 backdrop-blur-xl border border-white/10 p-4 rounded-3xl shadow-float animate-slide-up">
           <div className="grid grid-cols-4 gap-3">
             {gifts.slice(0, 8).map((g) => (
-              <button key={g.id} onClick={() => sendGift(g)} className="flex flex-col items-center p-2 rounded-2xl bg-white/5 border border-white/5 hover:border-brand-500/50 active:scale-95 transition-all">
+              <button key={g.id} onClick={() => sendGift(g)} className="flex flex-col items-center p-2 rounded-2xl bg-white/5 border border-white/5 hover:border-[#FF4DBD]/50 active:scale-95 transition-all">
                 {g.imageUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={`${API_ORIGIN}${g.imageUrl}`} alt={g.name} className="h-10 w-10 object-contain drop-shadow-md" />
@@ -642,7 +711,7 @@ export default function CallScreen() {
 
       {/* Controls */}
       {isEndState ? (
-        <div className="absolute bottom-0 inset-x-0 pb-safe px-6 pt-10 bg-gradient-to-t from-[#0a0a0c] to-transparent">
+        <div className="absolute bottom-0 inset-x-0 pb-safe-bottom px-6 pt-10 bg-gradient-to-t from-[#0a0a0c] to-transparent">
           <div className="flex flex-col items-center pb-6">
             <p className="text-sm font-medium text-white/70 mb-5">{statusLabel[callState]}</p>
             {callState === 'insufficient' && (
@@ -655,11 +724,11 @@ export default function CallScreen() {
             )}
             <div className="flex w-full gap-3">
               {callState === 'insufficient' ? (
-                <Link href="/app/wallet" className="flex-1 h-14 rounded-2xl bg-brand-gradient text-white flex items-center justify-center text-sm font-bold shadow-glow active:scale-[0.98] transition-transform">
+                <Link href="/app/wallet" className="flex-1 h-14 rounded-2xl bg-gradient-to-r from-[#FF4DBD] to-[#A855F7] text-white flex items-center justify-center text-sm font-bold shadow-glow active:scale-[0.98] transition-transform">
                   Top up coins
                 </Link>
               ) : (
-                <Link href={`/app/chat/${id}`} className="flex-1 h-14 rounded-2xl bg-brand-600 text-white flex items-center justify-center text-sm font-bold shadow-glow active:scale-[0.98] transition-transform">
+                <Link href={`/app/chat/${id}`} className="flex-1 h-14 rounded-2xl bg-[#FF4DBD] text-white flex items-center justify-center text-sm font-bold shadow-glow active:scale-[0.98] transition-transform">
                   Message
                 </Link>
               )}
@@ -673,57 +742,62 @@ export default function CallScreen() {
           </div>
         </div>
       ) : (
-        <div className="absolute bottom-0 inset-x-0 pb-safe pt-24 bg-gradient-to-t from-[#0a0a0c] via-[#0a0a0c]/80 to-transparent">
-          <div className="flex flex-col items-center pb-6">
-            <div className="flex items-center justify-center gap-4 bg-surface-raised border border-transparent p-3 rounded-full shadow-float mb-4">
+        <div className="absolute bottom-0 inset-x-0 pb-safe-bottom bg-transparent px-4">
+          <div className="flex items-end justify-between pb-8">
+            <div className="flex flex-col items-center gap-2">
               <button
                 onClick={toggleMic}
-                className={`h-12 w-12 rounded-full flex items-center justify-center transition-all active:scale-90 ${micOn ? 'bg-surface-overlay text-white hover:bg-white/10' : 'bg-white text-black shadow-glow'}`}
+                className="h-[60px] w-[60px] rounded-full flex items-center justify-center bg-transparent border border-white/30 text-white backdrop-blur-sm active:scale-90 transition-transform"
                 aria-label="Toggle microphone"
               >
-                {micOn ? <MicIcon size={20} /> : <MicOffIcon size={20} />}
+                {micOn ? <MicIcon size={24} /> : <MicOffIcon size={24} />}
               </button>
-              {type === 'VIDEO' && (
-                <button
-                  onClick={toggleCam}
-                  className={`h-12 w-12 rounded-full flex items-center justify-center transition-all active:scale-90 ${camOn ? 'bg-surface-overlay text-white hover:bg-white/10' : 'bg-white text-black shadow-glow'}`}
-                  aria-label="Toggle camera"
-                >
-                  {camOn ? <VideoIcon size={20} /> : <CameraOffIcon size={20} />}
-                </button>
-              )}
+              <span className="text-[10px] text-white font-medium">Mute</span>
+            </div>
+            
+            <div className="flex flex-col items-center gap-2">
               <button
-                onClick={() => setSpeakerOn((v) => !v)}
-                className={`h-12 w-12 rounded-full flex items-center justify-center transition-all active:scale-90 ${speakerOn ? 'bg-surface-overlay text-white hover:bg-white/10' : 'bg-white text-black'}`}
-                aria-label="Toggle speaker"
+                onClick={toggleCam}
+                className="h-[60px] w-[60px] rounded-full flex items-center justify-center bg-transparent border border-white/30 text-white backdrop-blur-sm active:scale-90 transition-transform"
+                aria-label="Toggle camera"
               >
-                {speakerOn ? <SpeakerIcon size={20} /> : <SpeakerMutedIcon />}
+                {camOn ? <VideoIcon size={24} /> : <CameraOffIcon size={24} />}
               </button>
-              {type !== 'VIDEO' && (
-                <>
-                  <button
-                    onClick={() => setShowGifts((s) => !s)}
-                    className="h-12 w-12 rounded-full flex items-center justify-center transition-all active:scale-90 bg-surface-overlay text-white hover:bg-white/10"
-                    aria-label="Gift"
-                  >
-                    <GiftIcon size={20} />
-                  </button>
-                </>
-              )}
+              <span className="text-[10px] text-white font-medium">Camera</span>
+            </div>
+
+            <div className="flex flex-col items-center gap-2 -mt-2">
               <button
                 onClick={endCall}
-                className="h-14 w-14 rounded-full bg-red-500 text-white flex items-center justify-center shadow-glow active:scale-90 transition-transform ml-2"
+                className="h-[72px] w-[72px] rounded-full bg-red-500 text-white flex items-center justify-center shadow-[0_0_20px_rgba(239,68,68,0.4)] active:scale-90 transition-transform"
                 aria-label="End call"
               >
-                <CloseIcon size={24} />
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.42 19.42 0 0 1-3.33-2.67m-2.67-3.34a19.79 19.79 0 0 1-3.07-8.63A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91"/></svg>
               </button>
+              <span className="text-[10px] text-white font-medium">End Call</span>
             </div>
-            {type === 'VIDEO' && (
-               <div className="flex gap-6 mb-2">
-                 <button onClick={() => setShowGifts((s) => !s)} className="text-[10px] uppercase tracking-widest font-bold text-white/60 hover:text-white flex items-center gap-1.5"><GiftIcon size={12} /> Gift</button>
-                 <button onClick={report} className="text-[10px] uppercase tracking-widest font-bold text-white/60 hover:text-white flex items-center gap-1.5"><FlagIcon size={12} /> Report</button>
-               </div>
-            )}
+
+            <div className="flex flex-col items-center gap-2">
+              <button
+                onClick={() => {}}
+                className="h-[60px] w-[60px] rounded-full flex items-center justify-center bg-transparent border border-white/30 text-white backdrop-blur-sm active:scale-90 transition-transform"
+                aria-label="Chat"
+              >
+                <ChatDotIcon />
+              </button>
+              <span className="text-[10px] text-white font-medium">Chat</span>
+            </div>
+
+            <div className="flex flex-col items-center gap-2">
+              <button
+                onClick={() => setSpeakerOn(!speakerOn)}
+                className="h-[60px] w-[60px] rounded-full flex items-center justify-center bg-transparent border border-white/30 text-white backdrop-blur-sm active:scale-90 transition-transform"
+                aria-label="Toggle speaker"
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+              </button>
+              <span className="text-[10px] text-white font-medium">More</span>
+            </div>
           </div>
         </div>
       )}
@@ -742,8 +816,8 @@ function SpeakerMutedIcon() {  return (
 
 function ChatDotIcon() {
   return (
-    <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+    <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
     </svg>
   );
 }

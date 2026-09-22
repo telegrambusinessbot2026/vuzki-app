@@ -6,16 +6,14 @@ import { useAuth } from '@/lib/auth-context';
 import { api, mediaUrl } from '@/lib/api';
 import { mapFeed } from '@/lib/api-users';
 import type { FeedUser, PublicUser } from '@/lib/api-users';
-import { Avatar } from '@/components/ui/Avatar';
 import { Spinner } from '@/components/ui/Button';
-import { SearchIcon, BellIcon, HeartIcon, ChatIcon, SparkleIcon } from '@/components/ui/Icons';
+import { SearchIcon, BellIcon } from '@/components/ui/Icons';
 import { FeedCard } from '@/components/domain/FeedCard';
 
 export default function HomePage() {
   const { user } = useAuth();
   const [feed, setFeed] = useState<FeedUser[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -23,25 +21,14 @@ export default function HomePage() {
       .then((data) => {
         if (!cancelled) setFeed((data.items ?? []).map(mapFeed));
       })
-      .catch((e) => {
-        if (!cancelled) setError(e?.message || 'Could not load feed');
-      })
+      .catch(() => {})
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
 
-  const stories = useMemo(
-    () =>
-      feed
-        .filter((u) => u.onlineStatus)
-        .slice(0, 10)
-        .map((u, i) => ({ user: u, viewed: i > 2 })),
-    [feed]
-  );
+  const stories = useMemo(() => feed.filter((u) => u.onlineStatus).slice(0, 10).map((u, i) => ({ user: u, viewed: i > 2 })), [feed]);
 
   if (!user || loading) {
     return (
@@ -52,83 +39,107 @@ export default function HomePage() {
   }
 
   return (
-    <div className="px-4 pt-safe pb-24 min-h-dvh">
+    <div className="pt-safe pb-24 min-h-dvh flex flex-col bg-[#0a0a0c]">
       {/* Header */}
-      <header className="flex items-center justify-between py-4 mb-2">
+      <header className="px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <svg width="24" height="24" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M20 38C20 38 4 28 4 15C4 9.47715 8.47715 5 14 5C17.0678 5 19.8133 6.37923 21.6441 8.5684C23.0805 6.43851 25.5905 5 28.5 5C34.0228 5 38.5 9.47715 38.5 15C38.5 28 20 38 20 38Z" fill="url(#paint0_linear_logo)"/>
-            <defs>
-              <linearGradient id="paint0_linear_logo" x1="4" y1="5" x2="38.5" y2="38" gradientUnits="userSpaceOnUse">
-                <stop stopColor="#FF4DBD"/>
-                <stop offset="1" stopColor="#A855F7"/>
-              </linearGradient>
-            </defs>
-          </svg>
-          <h1 className="text-xl font-bold tracking-tight text-white">VUZKI</h1>
+          <h1 className="text-2xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-[#FF4DBD] to-[#A855F7]">VUZKI</h1>
         </div>
-        <div className="flex items-center gap-3">
-          <Link href="/app/search" className="p-2 text-white/70 hover:text-white rounded-full bg-surface-raised border border-surface-border">
-            <SearchIcon size={20} />
+        <div className="flex items-center gap-4">
+          <Link href="/app/search" className="text-white/80 hover:text-white">
+            <SearchIcon size={24} />
           </Link>
-          <Link href="/app/notifications" className="p-2 text-white/70 hover:text-white rounded-full bg-surface-raised border border-surface-border relative">
-            <BellIcon size={20} />
-            <span className="absolute top-1.5 right-1.5 h-2 w-2 bg-brand-500 rounded-full border border-surface" />
+          <Link href="/app/notifications" className="text-white/80 hover:text-white relative">
+            <BellIcon size={24} />
+            <span className="absolute top-0.5 right-1 h-2 w-2 bg-[#FF4DBD] rounded-full" />
           </Link>
         </div>
       </header>
 
-      {/* Stories / Filters Row */}
-      <div className="flex gap-4 overflow-x-auto no-scrollbar -mx-4 px-4 mb-6">
-        <button className="shrink-0 flex flex-col items-center gap-2">
+      {/* Tabs */}
+      <div className="px-4 py-2 flex items-center justify-between mb-2">
+        <div className="flex items-center gap-6">
           <div className="relative">
-            <div className="h-[68px] w-[68px] rounded-full p-[2px] border border-surface-border flex items-center justify-center bg-surface-raised">
-              <span className="text-2xl text-white/50">+</span>
-            </div>
+            <span className="text-white font-bold text-lg pb-1">For You</span>
+            <div className="absolute -bottom-1 left-0 right-0 h-1 bg-[#FF4DBD] rounded-full" />
           </div>
-          <span className="text-[11px] font-medium text-white">Add</span>
+          <span className="text-white/50 font-medium text-lg hover:text-white/80 cursor-pointer">Nearby</span>
+          <span className="text-white/50 font-medium text-lg hover:text-white/80 cursor-pointer">New</span>
+          <span className="text-white/50 font-medium text-lg hover:text-white/80 cursor-pointer">Popular</span>
+        </div>
+        <button className="text-white/70">
+           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+             <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+           </svg>
         </button>
-        <button className="shrink-0 flex flex-col items-center gap-2">
-          <div className="relative">
-            <div className="h-[68px] w-[68px] rounded-full bg-brand-gradient p-[2px] shadow-glow">
-              <div className="h-full w-full rounded-full bg-surface p-[2px]">
-                 <div className="w-full h-full rounded-full flex items-center justify-center font-bold text-white bg-surface-overlay">
-                    <SparkleIcon size={24} className="text-brand-500" />
-                 </div>
-              </div>
-            </div>
+      </div>
+
+      {/* Stories */}
+      <div className="flex gap-4 overflow-x-auto no-scrollbar px-4 py-4 mb-4">
+        <div className="shrink-0 flex flex-col items-center gap-2">
+          <div className="h-[72px] w-[72px] rounded-full border-2 border-dashed border-white/20 flex items-center justify-center bg-white/5">
+            <span className="text-2xl text-white">+</span>
           </div>
-          <span className="text-[11px] font-medium text-white">New</span>
-        </button>
+          <span className="text-[12px] font-medium text-white/80">Add Story</span>
+        </div>
+        <div className="shrink-0 flex flex-col items-center gap-2">
+          <div className="h-[72px] w-[72px] rounded-full border-2 border-transparent bg-white/10 p-[2px]">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={mediaUrl(user.avatarUrl) || `https://ui-avatars.com/api/?name=${user.displayName}`} alt="You" className="w-full h-full rounded-full object-cover" />
+          </div>
+          <span className="text-[12px] font-medium text-white/80">Your Story</span>
+        </div>
         {stories.map((s, i) => (
           <Link key={s.user.id} href={`/app/profile/${s.user.id}`} className="shrink-0 flex flex-col items-center gap-2">
-            <div className={`h-[68px] w-[68px] rounded-full p-[2px] ${s.viewed ? 'border border-surface-border bg-surface-raised' : 'bg-brand-gradient'}`}>
-              <div className={`h-full w-full rounded-full p-[2px] ${s.viewed ? '' : 'bg-surface'}`}>
-                  {(() => {
-                    const src = mediaUrl(s.user.avatarUrl);
-                    return src ? (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img src={src} alt={s.user.displayName} className="w-full h-full rounded-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full rounded-full flex items-center justify-center font-bold text-brand-300 text-lg bg-surface-overlay">
-                        {(s.user.displayName || '?').charAt(0).toUpperCase()}
-                      </div>
-                    );
-                  })()}
-                </div>
+            <div className={`h-[72px] w-[72px] rounded-full p-[3px] ${s.viewed ? 'bg-white/20' : 'bg-gradient-to-tr from-[#FF4DBD] to-[#A855F7]'}`}>
+              <div className="h-full w-full rounded-full border-[3px] border-[#0a0a0c] bg-surface overflow-hidden">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={mediaUrl(s.user.avatarUrl) || `https://i.pravatar.cc/150?u=${s.user.id}`} alt={s.user.displayName} className="w-full h-full object-cover" />
+              </div>
             </div>
-            <span className="text-[11px] font-medium text-white">{i === 0 ? 'Nearby' : i === 1 ? 'Popular' : s.user.displayName.split(' ')[0]}</span>
+            <span className="text-[12px] font-medium text-white/80">{s.user.displayName.split(' ')[0]}</span>
           </Link>
         ))}
       </div>
 
-      {error && <p className="text-xs text-red-400 mb-3">{error}</p>}
-
-      {/* For you feed */}
-      <div className="space-y-6">
-        {feed.map((u) => (
-          <FeedCard key={u.id} user={u} />
+      {/* Main Carousel */}
+      <div className="flex overflow-x-auto snap-x snap-mandatory gap-4 px-4 pb-8 no-scrollbar">
+        {feed.slice(0, 5).map((u) => (
+          <div key={u.id} className="w-[85vw] max-w-[320px] shrink-0 snap-center">
+            <FeedCard user={u} />
+          </div>
         ))}
+      </div>
+
+      {/* People Near You */}
+      <div className="px-4 mb-4">
+        <h2 className="text-lg font-bold text-white mb-4">People Near You</h2>
+        <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
+          {feed.slice(5, 12).map((u) => (
+            <Link key={u.id} href={`/app/profile/${u.id}`} className="shrink-0 w-[100px] flex flex-col">
+              <div className="relative aspect-square rounded-2xl overflow-hidden mb-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={mediaUrl(u.avatarUrl) || `https://i.pravatar.cc/150?u=${u.id}`} alt={u.displayName} className="w-full h-full object-cover" />
+                {u.onlineStatus && <div className="absolute top-2 right-2 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-[#0a0a0c]" />}
+              </div>
+              <span className="text-[13px] font-bold text-white truncate">{u.displayName.split(' ')[0]}</span>
+              <span className="text-[11px] text-white/50">{u.city || '2 km away'}</span>
+            </Link>
+          ))}
+        </div>
+      </div>
+
+      {/* Banner */}
+      <div className="px-4 mt-2">
+        <div className="rounded-2xl bg-gradient-to-r from-[#2c1338] to-[#1a0b22] p-4 flex items-center justify-between border border-[#FF4DBD]/20">
+          <div>
+            <h3 className="font-bold text-white mb-1">Go Premium! 🌟</h3>
+            <p className="text-xs text-white/70">See who liked you & more</p>
+          </div>
+          <button className="px-4 py-2 rounded-full bg-[#FF4DBD] text-white text-xs font-bold">
+            Upgrade
+          </button>
+        </div>
       </div>
     </div>
   );
