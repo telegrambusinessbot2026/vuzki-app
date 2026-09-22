@@ -77,20 +77,20 @@ export default function OnboardingPage() {
   return (
     <div className="min-h-dvh bg-[#0a0a0c] px-6 flex flex-col pt-safe relative overflow-hidden">
       {/* Decorative background elements */}
-      <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[50%] bg-brand-600/20 blur-[120px] rounded-full pointer-events-none" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[40%] bg-pink-600/20 blur-[120px] rounded-full pointer-events-none" />
+      <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1517365830460-955ce3ccd263?q=80&w=600&auto=format&fit=crop')] bg-cover bg-center opacity-30" />
+      <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0c] via-[#0a0a0c]/80 to-transparent" />
 
-      <div className="mt-8 mb-8 relative z-10">
-        <div className="flex items-center gap-1.5 mb-6">
+      <div className="mt-8 mb-8 relative z-10 text-center">
+        <div className="flex items-center justify-center gap-2 mb-8 mt-12">
           {steps.map((s, i) => (
-            <div key={s} className={`h-1.5 flex-1 rounded-full ${i <= step ? 'bg-brand-500 shadow-glow' : 'bg-white/10'}`} />
+            <div key={s} className={`h-2 rounded-full transition-all ${i === step ? 'w-8 bg-brand-500 shadow-glow' : 'w-2 bg-white/20'}`} />
           ))}
         </div>
-        <h1 className="text-3xl font-extrabold tracking-tight text-white mb-1 drop-shadow-md">
+        <h1 className="text-4xl font-extrabold tracking-tight text-white mb-2 drop-shadow-md">
           {step === 0 && 'What excites you?'}
-          {step === 1 && 'Tell people about you'}
-          {step === 2 && 'Languages you speak'}
-          {step === 3 && 'Your match preferences'}
+          {step === 1 && 'Tell about you'}
+          {step === 2 && 'Languages'}
+          {step === 3 && 'Preferences'}
         </h1>
         <p className="text-white/60 font-medium text-sm">
           Step {step + 1} of {steps.length} — {steps[step]}

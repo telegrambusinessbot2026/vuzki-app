@@ -2,71 +2,63 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { Avatar, CreatorBadge, PremiumBadge, VerifiedIcon } from '@/components/ui/Avatar';
-import { CoinIcon, PhoneIcon, VideoIcon } from '@/components/ui/Icons';
-import { Badge } from '@/components/ui/Card';
+import { CoinIcon, HeartIcon, ChatIcon, SparkleIcon, VideoIcon } from '@/components/ui/Icons';
+import { VerifiedIcon } from '@/components/ui/Avatar';
 import type { MockUser } from '@/lib/mock';
 
 export function FeedCard({ user }: { user: MockUser }) {
   return (
-    <div className="glass-panel rounded-3xl overflow-hidden group">
-      <div className="relative h-64 overflow-hidden">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={user.avatarUrl!} alt={user.displayName} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0c] via-black/20 to-transparent" />
-        
-        <div className="absolute top-3 left-3 flex items-center gap-2">
-          {user.isPremium && <PremiumBadge tier="PREMIUM" />}
-          {user.badges.includes('TRENDING') && <Badge color="amber">🔥 Trending</Badge>}
-        </div>
-        
-        <div className="absolute bottom-3 inset-x-4 flex items-end justify-between">
-          <div className="flex-1">
-            <div className="flex items-center gap-2">
-              <span className="text-xl font-bold tracking-tight text-white">{user.displayName}</span>
-              <span className="text-lg font-light text-white/80">{user.age}</span>
-              {user.isVerified && <VerifiedIcon size={16} />}
-            </div>
-            <p className="text-xs text-white/60 font-medium flex items-center gap-1.5 mt-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-brand-400 shadow-glow"></span>
-              {user.city}{user.distance ? ` · ${user.distance} away` : ''}
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Link href={`/app/call/${user.id}?type=audio&name=${encodeURIComponent(user.displayName)}`} aria-label={`Audio call with ${user.displayName}`}>
-              <span className="flex h-10 w-10 items-center justify-center rounded-full glass backdrop-blur-md text-white transition-all active:scale-90 hover:bg-white/20 hover:text-brand-300" role="presentation">
-                <PhoneIcon size={18} />
-              </span>
-            </Link>
-            <Link href={`/app/call/${user.id}?type=video&name=${encodeURIComponent(user.displayName)}`} aria-label={`Video call with ${user.displayName}`}>
-              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-600 shadow-glow text-white transition-all active:scale-90 hover:bg-brand-500" role="presentation">
-                <VideoIcon size={18} />
-              </span>
-            </Link>
-          </div>
-        </div>
+    <div className="relative w-full aspect-[3/4] rounded-3xl overflow-hidden group">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={user.avatarUrl!} alt={user.displayName} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+      <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0c] via-black/30 to-transparent opacity-80" />
+      <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-transparent opacity-50" />
+      
+      {/* Top right floating badges */}
+      <div className="absolute top-4 right-4 flex items-center gap-2">
+        <button className="h-8 w-8 rounded-full bg-black/20 backdrop-blur-md flex items-center justify-center text-white/80 hover:text-white">
+           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+        </button>
       </div>
       
-      <div className="p-4 pt-2">
-        <p className="text-sm text-white/70 line-clamp-2 leading-relaxed">{user.bio}</p>
-        <div className="flex items-center justify-between mt-3">
-          <div className="flex gap-1.5 flex-wrap max-w-[70%]">
-            {user.interests.slice(0, 3).map((it) => (
-              <span key={it} className="text-[10px] uppercase font-bold tracking-wider px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-white/60">{it}</span>
-            ))}
-          </div>
-          <div className="flex items-center gap-2.5">
-            {user.isCreator && <CreatorBadge />}
-            {user.totalCoins && (
-              <span className="flex items-center gap-1 text-xs font-bold text-amber-400 bg-amber-400/10 px-2.5 py-1 rounded-full border border-amber-400/20">
-                <CoinIcon size={12} /> {user.totalCoins.toLocaleString()}
-              </span>
-            )}
+      {/* Bottom Content */}
+      <div className="absolute bottom-4 inset-x-4">
+        <div className="flex items-center gap-2 mb-1">
+          {user.avatarUrl && (
+             // eslint-disable-next-line @next/next/no-img-element
+             <img src={user.avatarUrl} alt="" className="w-8 h-8 rounded-full border border-white/20 object-cover shadow-sm" />
+          )}
+          <div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xl font-bold tracking-tight text-white drop-shadow-sm">{user.displayName}, {user.age}</span>
+              {user.isVerified && <VerifiedIcon size={16} />}
+            </div>
+            <p className="text-[11px] text-white/70 font-medium flex items-center gap-1.5 drop-shadow-sm">
+              {user.onlineStatus ? <span className="w-1.5 h-1.5 rounded-full bg-brand-400 shadow-glow"></span> : null}
+              {user.onlineStatus ? 'Online now' : 'Just now'}
+            </p>
           </div>
         </div>
-        <Link href={`/app/profile/${user.id}`} className="mt-4 block w-full h-11 rounded-2xl glass border border-white/10 text-white/90 text-sm font-semibold flex items-center justify-center hover:bg-white/10 transition-colors">
-          View Profile
-        </Link>
+        
+        <p className="text-[13px] text-white/90 mb-4 drop-shadow-sm">{user.bio}</p>
+        
+        <div className="flex items-center gap-4">
+           <button className="flex items-center gap-1.5 group/btn">
+             <span className="h-10 w-10 rounded-full bg-brand-gradient flex items-center justify-center text-white shadow-glow transition-transform group-active/btn:scale-95 border-2 border-transparent hover:border-white/20">
+               <HeartIcon size={20} className="fill-current" />
+             </span>
+           </button>
+           <Link href={`/app/chat/${user.id}`} className="flex items-center gap-1.5 group/btn">
+             <span className="h-10 w-10 rounded-full bg-surface/50 backdrop-blur-md flex items-center justify-center text-white border border-white/20 transition-transform group-active/btn:scale-95 hover:bg-surface/70">
+               <ChatIcon size={20} />
+             </span>
+           </Link>
+           <Link href={`/app/call/${user.id}?type=video&name=${encodeURIComponent(user.displayName)}`} className="flex items-center gap-1.5 group/btn ml-auto">
+             <span className="h-10 w-10 rounded-full bg-surface/50 backdrop-blur-md flex items-center justify-center text-white border border-white/20 transition-transform group-active/btn:scale-95 hover:bg-surface/70">
+               <VideoIcon size={20} />
+             </span>
+           </Link>
+        </div>
       </div>
     </div>
   );

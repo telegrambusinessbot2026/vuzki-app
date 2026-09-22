@@ -474,7 +474,7 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
 
   return (
     <div className={`flex ${mine ? 'justify-end' : 'justify-start'} group`}>
-      <div className={`max-w-[80%] px-4 py-2.5 rounded-[22px] text-sm leading-relaxed shadow-sm border ${mine ? 'bg-brand-600 border-brand-500 rounded-br-md text-white' : 'glass border-white/10 rounded-bl-md text-white/90'}`}>
+      <div className={`max-w-[80%] px-4 py-2.5 rounded-[22px] text-sm leading-relaxed shadow-sm border ${mine ? 'bg-brand-gradient border-white/10 rounded-br-md text-white shadow-glow' : 'bg-surface-raised border-surface-border rounded-bl-md text-white/90 shadow-glass'}`}>
         {msg.type === 'IMAGE' && msg.mediaUrl && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={mediaUrl(msg.mediaUrl)} alt="attachment" className="max-w-[220px] rounded-xl mb-2 object-cover border border-white/10" />

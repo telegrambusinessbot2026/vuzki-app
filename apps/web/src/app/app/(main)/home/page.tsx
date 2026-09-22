@@ -6,9 +6,9 @@ import { useAuth } from '@/lib/auth-context';
 import { api, mediaUrl } from '@/lib/api';
 import { mapFeed } from '@/lib/api-users';
 import type { FeedUser, PublicUser } from '@/lib/api-users';
-import { Avatar, CreatorBadge, PremiumBadge, VerifiedIcon } from '@/components/ui/Avatar';
+import { Avatar } from '@/components/ui/Avatar';
 import { Spinner } from '@/components/ui/Button';
-import { CoinIcon, MicIcon, SearchIcon, SparkleIcon, PhoneIcon } from '@/components/ui/Icons';
+import { SearchIcon, BellIcon, HeartIcon, ChatIcon, SparkleIcon } from '@/components/ui/Icons';
 import { FeedCard } from '@/components/domain/FeedCard';
 
 export default function HomePage() {
@@ -34,14 +34,11 @@ export default function HomePage() {
     };
   }, []);
 
-  const featured = useMemo(() => feed.filter((u) => u.isCreator).slice(0, 6), [feed]);
-  const online = useMemo(() => feed.filter((u) => u.onlineStatus).slice(0, 10), [feed]);
-  const forYou = useMemo(() => feed.slice(6, 16), [feed]);
   const stories = useMemo(
     () =>
       feed
         .filter((u) => u.onlineStatus)
-        .slice(0, 5)
+        .slice(0, 10)
         .map((u, i) => ({ user: u, viewed: i > 2 })),
     [feed]
   );
@@ -49,172 +46,90 @@ export default function HomePage() {
   if (!user || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <Spinner className="h-6 w-6 text-white/50" />
+        <Spinner className="h-6 w-6 text-brand-500" />
       </div>
     );
   }
 
-  const firstName = user.displayName?.split(' ')[0] || 'there';
-
   return (
-    <div className="px-4 pt-4 pb-4">
+    <div className="px-4 pt-safe pb-24 min-h-dvh">
       {/* Header */}
-      <header className="flex items-center justify-between mb-4">
-        <div>
-          <p className="text-xs text-white/50">Hi {firstName} 👋</p>
-          <h1 className="text-xl font-bold tracking-tight">
-            Let&apos;s <span className="bg-gradient-to-r from-brand-400 to-pink-500 bg-clip-text text-transparent">connect</span>
-          </h1>
+      <header className="flex items-center justify-between py-4 mb-2">
+        <div className="flex items-center gap-2">
+          <svg width="24" height="24" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M20 38C20 38 4 28 4 15C4 9.47715 8.47715 5 14 5C17.0678 5 19.8133 6.37923 21.6441 8.5684C23.0805 6.43851 25.5905 5 28.5 5C34.0228 5 38.5 9.47715 38.5 15C38.5 28 20 38 20 38Z" fill="url(#paint0_linear_logo)"/>
+            <defs>
+              <linearGradient id="paint0_linear_logo" x1="4" y1="5" x2="38.5" y2="38" gradientUnits="userSpaceOnUse">
+                <stop stopColor="#FF4DBD"/>
+                <stop offset="1" stopColor="#A855F7"/>
+              </linearGradient>
+            </defs>
+          </svg>
+          <h1 className="text-xl font-bold tracking-tight text-white">VUZKI</h1>
         </div>
         <div className="flex items-center gap-3">
-          <Link href="/app/search" className="p-2 text-white/70 hover:text-white rounded-full hover:bg-surface-overlay">
-            <SearchIcon />
+          <Link href="/app/search" className="p-2 text-white/70 hover:text-white rounded-full bg-surface-raised border border-surface-border">
+            <SearchIcon size={20} />
           </Link>
-          <Link href="/app/wallet" className="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-surface-overlay border border-surface-border text-amber-400">
-            <CoinIcon />
-            <span className="text-xs font-semibold">{user.wallet?.balance?.toLocaleString() ?? '120'}</span>
-          </Link>
-          <Link href="/app/notifications">
-            <span className="relative inline-flex">
-              <Avatar src={user.avatarUrl} name={user.displayName} size="sm" online />
-              <span className="absolute -top-0.5 -right-0.5 h-3 w-3 bg-pink-500 rounded-full border-2 border-surface" />
-            </span>
+          <Link href="/app/notifications" className="p-2 text-white/70 hover:text-white rounded-full bg-surface-raised border border-surface-border relative">
+            <BellIcon size={20} />
+            <span className="absolute top-1.5 right-1.5 h-2 w-2 bg-brand-500 rounded-full border border-surface" />
           </Link>
         </div>
       </header>
 
-      {/* Curated daily card */}
-      <div className="relative rounded-3xl overflow-hidden mb-6 bg-gradient-to-br from-brand-900/40 to-pink-900/20 border border-white/5 shadow-float">
-        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 mix-blend-overlay" />
-        <div className="relative p-5 flex items-center justify-between">
-          <div>
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/10 text-[10px] font-bold tracking-wider text-white/90 mb-2">
-              <SparkleIcon size={12} className="text-brand-300" /> DAILY CURATED
+      {/* Stories / Filters Row */}
+      <div className="flex gap-4 overflow-x-auto no-scrollbar -mx-4 px-4 mb-6">
+        <button className="shrink-0 flex flex-col items-center gap-2">
+          <div className="relative">
+            <div className="h-[68px] w-[68px] rounded-full p-[2px] border border-surface-border flex items-center justify-center bg-surface-raised">
+              <span className="text-2xl text-white/50">+</span>
             </div>
-            <h3 className="font-extrabold text-xl leading-tight text-white shadow-sm">Your perfect matches</h3>
-            <p className="text-brand-200/80 text-xs mt-1 font-medium">{featured.length} creators matched to you</p>
           </div>
-          <div className="flex -space-x-3">
-            {featured.slice(0, 3).map((u) => {
-              const src = mediaUrl(u.avatarUrl);
-              return (
-              <div key={u.id} className="h-14 w-14 rounded-full border-2 border-surface bg-surface-overlay overflow-hidden shadow-glass">
-                {src ? (
-                  /* eslint-disable-next-line @next/next/no-img-element */
-                  <img src={src} alt={u.displayName} className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center font-bold text-brand-300 text-lg bg-surface-raised">
-                    {(u.displayName || '?').charAt(0).toUpperCase()}
-                  </div>
-                )}
+          <span className="text-[11px] font-medium text-white">Add</span>
+        </button>
+        <button className="shrink-0 flex flex-col items-center gap-2">
+          <div className="relative">
+            <div className="h-[68px] w-[68px] rounded-full bg-brand-gradient p-[2px] shadow-glow">
+              <div className="h-full w-full rounded-full bg-surface p-[2px]">
+                 <div className="w-full h-full rounded-full flex items-center justify-center font-bold text-white bg-surface-overlay">
+                    <SparkleIcon size={24} className="text-brand-500" />
+                 </div>
               </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      {/* Talk Now CTA */}
-      <Link href="/app/talknow" className="group block mb-6 rounded-3xl overflow-hidden relative bg-brand-gradient border border-white/10 shadow-glow hover:shadow-glow-pink transition-all duration-300">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_100%_0%,rgba(255,255,255,0.3),transparent_50%)]" />
-        <div className="absolute top-0 right-0 p-8 opacity-20 group-hover:scale-110 group-hover:rotate-12 transition-transform duration-500">
-           <PhoneIcon size={120} />
-        </div>
-        <div className="relative p-5 flex items-center justify-between">
-          <div>
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/20 backdrop-blur-md text-[10px] font-bold tracking-wider text-white mb-2 shadow-sm">
-              <PhoneIcon size={12} className="animate-pulse" /> LIVE NOW
             </div>
-            <h3 className="font-extrabold text-xl leading-tight text-white drop-shadow-md">Talk to a stranger</h3>
-            <p className="text-white/80 text-sm mt-1 font-medium">Audio & video · No matches needed</p>
           </div>
-          <div className="h-14 w-14 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center shrink-0 shadow-glass group-hover:scale-110 transition-transform duration-300">
-            <PhoneIcon size={24} className="text-white" />
-          </div>
-        </div>
-      </Link>
+          <span className="text-[11px] font-medium text-white">New</span>
+        </button>
+        {stories.map((s, i) => (
+          <Link key={s.user.id} href={`/app/profile/${s.user.id}`} className="shrink-0 flex flex-col items-center gap-2">
+            <div className={`h-[68px] w-[68px] rounded-full p-[2px] ${s.viewed ? 'border border-surface-border bg-surface-raised' : 'bg-brand-gradient'}`}>
+              <div className={`h-full w-full rounded-full p-[2px] ${s.viewed ? '' : 'bg-surface'}`}>
+                  {(() => {
+                    const src = mediaUrl(s.user.avatarUrl);
+                    return src ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img src={src} alt={s.user.displayName} className="w-full h-full rounded-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full rounded-full flex items-center justify-center font-bold text-brand-300 text-lg bg-surface-overlay">
+                        {(s.user.displayName || '?').charAt(0).toUpperCase()}
+                      </div>
+                    );
+                  })()}
+                </div>
+            </div>
+            <span className="text-[11px] font-medium text-white">{i === 0 ? 'Nearby' : i === 1 ? 'Popular' : s.user.displayName.split(' ')[0]}</span>
+          </Link>
+        ))}
+      </div>
 
       {error && <p className="text-xs text-red-400 mb-3">{error}</p>}
 
-      {/* Stories */}
-      <StoriesRow stories={stories} />
-
-      {/* Online now */}
-      <section className="mb-5">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="font-bold">Online Now</h2>
-          <Link href="/app/discover" className="text-xs text-brand-400">Discover</Link>
-        </div>
-        <div className="flex gap-3 overflow-x-auto no-scrollbar -mx-4 px-4">
-          {online.map((u) => (
-            <OnlinePill key={u.id} user={u} />
-          ))}
-        </div>
-      </section>
-
       {/* For you feed */}
-      <section className="mb-4">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="font-bold">For You</h2>
-          <Link href="/app/discover" className="text-xs text-brand-400">View all</Link>
-        </div>
-        <div className="space-y-4">
-          {forYou.map((u) => (
-            <FeedCard key={u.id} user={u} />
-          ))}
-        </div>
-      </section>
+      <div className="space-y-6">
+        {feed.map((u) => (
+          <FeedCard key={u.id} user={u} />
+        ))}
+      </div>
     </div>
-  );
-}
-
-function StoriesRow({ stories }: { stories: { user: FeedUser; viewed: boolean }[] }) {
-  return (
-    <div className="flex gap-3 overflow-x-auto no-scrollbar -mx-4 px-4 mb-5">
-      <Link href="/app/profile" className="shrink-0 flex flex-col items-center gap-1">
-        <div className="relative">
-          <div className="h-16 w-16 rounded-full bg-gradient-to-tr from-brand-500 to-pink-500 p-[2px]">
-            <div className="h-full w-full rounded-full bg-surface flex items-center justify-center">
-              <span className="text-2xl">+</span>
-            </div>
-          </div>
-        </div>
-        <span className="text-[10px] text-white/60">Your story</span>
-      </Link>
-      {stories.map((s) => (
-        <Link key={s.user.id} href={`/app/profile/${s.user.id}`} className="shrink-0 flex flex-col items-center gap-1">
-          <div className={`h-16 w-16 rounded-full p-[2px] ${s.viewed ? 'bg-surface-border' : 'bg-gradient-to-tr from-brand-500 to-pink-500'}`}>
-            <div className="h-full w-full rounded-full bg-surface p-0.5">
-                {(() => {
-                  const src = mediaUrl(s.user.avatarUrl);
-                  return src ? (
-                    /* eslint-disable-next-line @next/next/no-img-element */
-                    <img src={src} alt={s.user.displayName} className="w-full h-full rounded-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full rounded-full flex items-center justify-center font-bold text-brand-300 text-lg bg-gradient-to-br from-surface-overlay to-surface-raised">
-                      {(s.user.displayName || '?').charAt(0).toUpperCase()}
-                    </div>
-                  );
-                })()}
-              </div>
-          </div>
-          <span className="text-[10px] text-white/70">{s.user.displayName.split(' ')[0]}</span>
-        </Link>
-      ))}
-    </div>
-  );
-}
-
-function OnlinePill({ user }: { user: FeedUser }) {
-  return (
-    <Link href={`/app/profile/${user.id}`} className="shrink-0 flex flex-col items-center gap-1">
-      <span className="relative">
-        <Avatar src={user.avatarUrl} name={user.displayName} size="lg" online />
-      </span>
-      <span className="text-[10px] text-white/70">{user.displayName.split(' ')[0]}</span>
-      <span className="flex items-center gap-1 text-[9px] text-white/40">
-        {user.isCreator && <MicIcon size={9} className="text-brand-400" />} {user.countryCode}
-      </span>
-    </Link>
   );
 }

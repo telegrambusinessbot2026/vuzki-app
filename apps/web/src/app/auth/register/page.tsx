@@ -87,7 +87,7 @@ export default function RegisterPage() {
           <p className="text-white/60 text-sm font-medium">Join millions on VUZKI</p>
         </div>
 
-        <div className="glass-panel rounded-3xl p-6 relative z-10 border border-white/10 shadow-float mb-6">
+        <div className="mb-6 relative z-10 w-full max-w-sm mx-auto">
           <form onSubmit={handleRegister} className="space-y-4 flex-1">
             <Input label="Username" placeholder="coolmaya" value={username} onChange={(e) => setUsername(e.target.value)} required />
             <Input label="Email" type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
@@ -134,12 +134,12 @@ export default function RegisterPage() {
               </div>
             )}
 
-            <Button type="submit" variant="gradient" size="lg" full loading={loading} className="mt-6 shadow-glow">
+            <Button type="submit" variant="gradient" size="lg" full loading={loading} className="mt-8 shadow-glow rounded-2xl h-14 text-lg">
               Create Account
             </Button>
           </form>
 
-          <div className="mt-6 pt-6 border-t border-white/10 flex items-center justify-center text-sm font-medium">
+          <div className="mt-8 flex items-center justify-center text-sm font-medium">
              <span className="text-white/50 mr-2">Already have an account?</span>
              <Link href="/auth/login" className="text-brand-300 font-bold hover:text-brand-200 transition-colors">Log in</Link>
           </div>

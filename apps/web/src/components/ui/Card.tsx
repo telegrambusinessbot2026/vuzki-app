@@ -5,8 +5,8 @@ export function Card({ children, className = '', onClick, interactive }: { child
     <div
       onClick={onClick}
       className={[
-        'glass-panel rounded-3xl',
-        interactive ? 'cursor-pointer hover:border-brand-500/50 hover:bg-surface-raised transition-all' : '',
+        'bg-surface-raised border border-transparent rounded-3xl',
+        interactive ? 'cursor-pointer hover:border-brand-500/50 transition-all' : '',
         className,
       ].join(' ')}
     >
@@ -44,7 +44,7 @@ export function Chip({ selected, onClick, children }: { selected?: boolean; onCl
       onClick={onClick}
       className={[
         'px-4 py-2 rounded-full text-sm font-medium border transition-all active:scale-95',
-        selected ? 'bg-brand-600 border-brand-500 text-white shadow-glow' : 'bg-surface-overlay border-surface-border text-white/70 hover:border-brand-500',
+        selected ? 'bg-brand-gradient border-transparent text-white shadow-glow' : 'bg-surface-raised border-transparent text-white/70 hover:text-white',
       ].join(' ')}
     >
       {children}

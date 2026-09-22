@@ -146,15 +146,15 @@ export default function OtherProfilePage() {
 
         {/* Stats */}
         <div className="grid grid-cols-3 gap-3 mb-6">
-          <div className="text-center py-3 rounded-2xl glass-panel border border-white/5">
+          <div className="text-center py-3 rounded-2xl bg-surface-raised border border-transparent">
             <p className="text-lg font-bold text-white">{(user.followers ?? 0).toLocaleString()}</p>
             <p className="text-[10px] uppercase font-bold tracking-wider text-white/40 mt-0.5">Followers</p>
           </div>
-          <div className="text-center py-3 rounded-2xl glass-panel border border-white/5">
+          <div className="text-center py-3 rounded-2xl bg-surface-raised border border-transparent">
             <p className="text-lg font-bold text-white">{(user.following ?? 0).toLocaleString()}</p>
             <p className="text-[10px] uppercase font-bold tracking-wider text-white/40 mt-0.5">Following</p>
           </div>
-          <div className="text-center py-3 rounded-2xl glass-panel border border-white/5">
+          <div className="text-center py-3 rounded-2xl bg-surface-raised border border-transparent">
             <p className="text-lg font-bold text-white">{(user.profileViews ?? 0).toLocaleString()}</p>
             <p className="text-[10px] uppercase font-bold tracking-wider text-white/40 mt-0.5">Views</p>
           </div>
@@ -174,7 +174,7 @@ export default function OtherProfilePage() {
         {/* Interactions */}
         <div className="flex gap-3">
           <Link href={`/app/gifts?receiverId=${user.id}`} className="flex-1">
-            <Button variant="secondary" size="md" full icon={<GiftIcon size={18} />} className="border-white/10 glass-panel">Gift</Button>
+            <Button variant="secondary" size="md" full icon={<GiftIcon size={18} />} className="bg-surface-raised border-transparent">Gift</Button>
           </Link>
           <div className="flex-[2]">
             <Button
@@ -183,7 +183,7 @@ export default function OtherProfilePage() {
               full
               loading={followPending}
               onClick={toggleFollow}
-              className={following ? 'glass-panel border-white/10 text-brand-300' : ''}
+              className={following ? 'bg-surface-raised border-transparent text-brand-300' : 'shadow-glow'}
             >
               {following ? 'Following' : 'Follow'}
             </Button>

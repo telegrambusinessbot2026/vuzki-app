@@ -59,7 +59,7 @@ export default function LoginPage() {
           <p className="text-white/60 font-medium text-sm">Enter your details to sign in</p>
         </div>
 
-        <div className="glass-panel rounded-3xl p-6 relative z-10 border border-white/10 shadow-float">
+        <div className="rounded-3xl p-6 relative z-10 w-full max-w-sm mx-auto">
           <form onSubmit={handleLogin} className="space-y-4">
             <Input
               label={useOtp ? 'Phone or email' : 'Email or phone'}
@@ -102,12 +102,12 @@ export default function LoginPage() {
               </div>
             )}
 
-            <Button type="submit" variant="gradient" size="lg" full loading={loading} className="mt-6 shadow-glow">
+            <Button type="submit" variant="gradient" size="lg" full loading={loading} className="mt-8 shadow-glow rounded-2xl h-14 text-lg">
               Sign In
             </Button>
           </form>
 
-          <div className="mt-6 pt-6 border-t border-white/10 flex items-center justify-center text-sm font-medium">
+          <div className="mt-8 flex items-center justify-center text-sm font-medium">
             <span className="text-white/50 mr-2">New to Vuzki?</span>
             <Link href="/auth/register" className="text-brand-300 font-bold hover:text-brand-200 transition-colors">Create account</Link>
           </div>

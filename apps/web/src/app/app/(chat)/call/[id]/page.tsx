@@ -675,10 +675,10 @@ export default function CallScreen() {
       ) : (
         <div className="absolute bottom-0 inset-x-0 pb-safe pt-24 bg-gradient-to-t from-[#0a0a0c] via-[#0a0a0c]/80 to-transparent">
           <div className="flex flex-col items-center pb-6">
-            <div className="flex items-center justify-center gap-4 bg-white/5 backdrop-blur-xl border border-white/10 p-2 rounded-full shadow-glass mb-4">
+            <div className="flex items-center justify-center gap-4 bg-surface-raised border border-transparent p-3 rounded-full shadow-float mb-4">
               <button
                 onClick={toggleMic}
-                className={`h-12 w-12 rounded-full flex items-center justify-center transition-all active:scale-90 ${micOn ? 'bg-transparent text-white hover:bg-white/10' : 'bg-white text-black shadow-glow'}`}
+                className={`h-12 w-12 rounded-full flex items-center justify-center transition-all active:scale-90 ${micOn ? 'bg-surface-overlay text-white hover:bg-white/10' : 'bg-white text-black shadow-glow'}`}
                 aria-label="Toggle microphone"
               >
                 {micOn ? <MicIcon size={20} /> : <MicOffIcon size={20} />}
@@ -686,7 +686,7 @@ export default function CallScreen() {
               {type === 'VIDEO' && (
                 <button
                   onClick={toggleCam}
-                  className={`h-12 w-12 rounded-full flex items-center justify-center transition-all active:scale-90 ${camOn ? 'bg-transparent text-white hover:bg-white/10' : 'bg-white text-black shadow-glow'}`}
+                  className={`h-12 w-12 rounded-full flex items-center justify-center transition-all active:scale-90 ${camOn ? 'bg-surface-overlay text-white hover:bg-white/10' : 'bg-white text-black shadow-glow'}`}
                   aria-label="Toggle camera"
                 >
                   {camOn ? <VideoIcon size={20} /> : <CameraOffIcon size={20} />}
@@ -694,7 +694,7 @@ export default function CallScreen() {
               )}
               <button
                 onClick={() => setSpeakerOn((v) => !v)}
-                className={`h-12 w-12 rounded-full flex items-center justify-center transition-all active:scale-90 ${speakerOn ? 'bg-transparent text-white hover:bg-white/10' : 'bg-white text-black'}`}
+                className={`h-12 w-12 rounded-full flex items-center justify-center transition-all active:scale-90 ${speakerOn ? 'bg-surface-overlay text-white hover:bg-white/10' : 'bg-white text-black'}`}
                 aria-label="Toggle speaker"
               >
                 {speakerOn ? <SpeakerIcon size={20} /> : <SpeakerMutedIcon />}
@@ -703,7 +703,7 @@ export default function CallScreen() {
                 <>
                   <button
                     onClick={() => setShowGifts((s) => !s)}
-                    className="h-12 w-12 rounded-full flex items-center justify-center transition-all active:scale-90 bg-transparent text-white hover:bg-white/10"
+                    className="h-12 w-12 rounded-full flex items-center justify-center transition-all active:scale-90 bg-surface-overlay text-white hover:bg-white/10"
                     aria-label="Gift"
                   >
                     <GiftIcon size={20} />

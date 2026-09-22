@@ -22,10 +22,10 @@ export function Input({ label, error, hint, prefix, className = '', id, ...props
         <input
           id={inputId}
           className={[
-            'w-full h-12 px-4 bg-surface-overlay border rounded-xl text-white placeholder-white/30',
-            'focus:outline-none focus:ring-2 focus:ring-brand-500 transition-all',
+            'w-full h-12 px-4 bg-surface-raised border rounded-2xl text-white placeholder-white/30',
+            'focus:outline-none focus:bg-surface-overlay transition-all',
             prefix ? 'pl-10' : '',
-            error ? 'border-red-500' : 'border-surface-border',
+            error ? 'border-red-500' : 'border-transparent',
             className,
           ].join(' ')}
           {...props}
@@ -48,9 +48,9 @@ export function TextArea({ label, error, className = '', ...props }: React.Texta
       )}
       <textarea
         className={[
-          'w-full px-4 py-3 bg-surface-overlay border rounded-xl text-white placeholder-white/30',
-          'focus:outline-none focus:ring-2 focus:ring-brand-500 transition-all',
-          error ? 'border-red-500' : 'border-surface-border',
+          'w-full px-4 py-3 bg-surface-raised border rounded-2xl text-white placeholder-white/30',
+          'focus:outline-none focus:bg-surface-overlay transition-all',
+          error ? 'border-red-500' : 'border-transparent',
           className,
         ].join(' ')}
         {...props}
@@ -85,14 +85,14 @@ export function Select({ label, error, options, className = '', ...props }: Reac
       )}
       <select
         className={[
-          'w-full h-12 px-4 bg-surface-overlay border rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-brand-500',
-          error ? 'border-red-500' : 'border-surface-border',
+          'w-full h-12 px-4 bg-surface-raised border rounded-2xl text-white focus:outline-none focus:bg-surface-overlay transition-all',
+          error ? 'border-red-500' : 'border-transparent',
           className,
         ].join(' ')}
         {...props}
       >
         {options.map((o) => (
-          <option key={o.value} value={o.value} className="bg-surface-overlay">
+          <option key={o.value} value={o.value} className="bg-surface-raised">
             {o.label}
           </option>
         ))}

@@ -152,21 +152,15 @@ function SwipeStack() {
       </AnimatePresence>
 
       {/* Action buttons */}
-      <div className="absolute -bottom-6 inset-x-0 flex items-center justify-center gap-4 z-20">
-        <button onClick={() => onSwipe('left')} className="h-14 w-14 rounded-full glass backdrop-blur-xl border-white/10 text-white/80 flex items-center justify-center shadow-glass active:scale-90 hover:bg-white/10 transition-all" aria-label="Pass">
-          <CloseIcon size={20} />
+      <div className="absolute -bottom-8 inset-x-0 flex items-center justify-center gap-6 z-20">
+        <button onClick={() => onSwipe('left')} className="h-16 w-16 rounded-full bg-warning border-4 border-surface shadow-float flex items-center justify-center text-white active:scale-90 hover:scale-105 transition-all" aria-label="Pass">
+          <CloseIcon size={24} className="stroke-[3px]" />
         </button>
-        <button onClick={() => onSwipe('left')} className="h-12 w-12 rounded-full glass backdrop-blur-xl border-white/10 text-blue-400 flex items-center justify-center shadow-glass active:scale-90 hover:bg-white/10 transition-all" aria-label="Rewind">
-          <RefreshIcon size={18} />
+        <button onClick={() => onSwipe('right')} className="h-16 w-16 rounded-full bg-brand-gradient border-4 border-surface shadow-glow flex items-center justify-center text-white active:scale-90 hover:scale-105 transition-all" aria-label="Like">
+          <HeartIcon size={24} className="fill-current" />
         </button>
-        <button onClick={() => onSwipe('right')} className="h-14 w-14 rounded-full glass backdrop-blur-xl border-white/10 text-brand-400 flex items-center justify-center shadow-glass active:scale-90 hover:bg-brand-500/10 transition-all" aria-label="Like">
-          <SparkleIcon size={22} />
-        </button>
-        <button onClick={() => onSwipe('right', 'super_like')} className="h-12 w-12 rounded-full glass backdrop-blur-xl border-white/10 text-amber-400 flex items-center justify-center shadow-glass active:scale-90 hover:bg-amber-500/10 transition-all" aria-label="Super like">
-          <ZapIcon size={18} />
-        </button>
-        <button onClick={() => onSwipe('right', 'super_like')} className="h-14 w-14 rounded-full bg-gradient-to-br from-pink-500 to-rose-600 border border-pink-400/40 flex items-center justify-center shadow-glow-pink active:scale-90 hover:scale-105 transition-all" aria-label="Super like with heart">
-          <HeartIcon size={20} className="text-white" />
+        <button onClick={() => onSwipe('right', 'super_like')} className="absolute right-8 h-12 w-12 rounded-full bg-surface-raised border border-surface-border text-brand-300 shadow-glass flex items-center justify-center active:scale-90 hover:bg-surface-overlay transition-all" aria-label="Super Like">
+          <StarIcon size={20} className="fill-current" />
         </button>
       </div>
       <p className="text-center text-[10px] text-white/40 mt-16 font-medium uppercase tracking-wider">{likeCount} liked</p>

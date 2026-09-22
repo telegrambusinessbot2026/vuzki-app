@@ -95,7 +95,7 @@ export default function SettingsPage() {
       </header>
 
       <SectionTitle>Account</SectionTitle>
-      <Card className="divide-y divide-white/5 mb-8 glass-panel border border-white/5">
+      <Card className="divide-y divide-white/5 mb-8 bg-surface-raised border-transparent">
         <SettingsRow icon={<UserIcon size={18} />} label="Edit Profile" value={user?.displayName} href="/app/settings/profile" />
         <SettingsRow icon={<LockIcon size={18} />} label="Change Password" href="/app/settings/password" />
         <SettingsRow icon={<PhoneIcon size={18} />} label="Phone" value={user?.phone || 'Add phone'} href="/app/settings/identity" />
@@ -103,7 +103,7 @@ export default function SettingsPage() {
       </Card>
 
       <SectionTitle>Preferences</SectionTitle>
-      <Card className="divide-y divide-white/5 mb-8 glass-panel border border-white/5">
+      <Card className="divide-y divide-white/5 mb-8 bg-surface-raised border-transparent">
         <SettingsRow icon={<SettingsIcon size={18} />} label="Theme" value={user?.theme === 'light' ? 'Light' : 'Dark'} onClick={() => openModal('theme')} />
         <SettingsRow icon={<BellIcon size={18} />} label="Notifications" value="Manage" onClick={() => openModal('notifications')} />
         <SettingsRow icon={<DocumentIcon size={18} />} label="Language" value={LANGUAGES.find((l) => l.value === (user?.language ?? 'en'))?.label ?? 'English'} onClick={() => openModal('language')} />
@@ -111,14 +111,14 @@ export default function SettingsPage() {
       </Card>
 
       <SectionTitle>Privacy</SectionTitle>
-      <Card className="divide-y divide-white/5 mb-8 glass-panel border border-white/5">
+      <Card className="divide-y divide-white/5 mb-8 bg-surface-raised border-transparent">
         <SettingsRow icon={<UserIcon size={18} />} label="Who can message" value={whoCanLabel(user?.preferences?.whoCanMessage)} onClick={() => openModal('privacy')} />
         <SettingsRow icon={<EyeIcon size={18} />} label="Online status" value={user?.preferences?.showOnlineStatus === false ? 'Hidden' : 'Visible'} onClick={() => openModal('privacy')} />
         <SettingsRow icon={<ShieldIcon size={18} />} label="Blocked users" href="/app/settings/blocked" />
       </Card>
 
       <SectionTitle>Support</SectionTitle>
-      <Card className="divide-y divide-white/5 mb-8 glass-panel border border-white/5">
+      <Card className="divide-y divide-white/5 mb-8 bg-surface-raised border-transparent">
         <SettingsRow icon={<DocumentIcon size={18} />} label="Help Center" href="/safety" />
         <SettingsRow icon={<ShieldIcon size={18} />} label="Safety" href="/app/safety" />
         <SettingsRow icon={<DocumentIcon size={18} />} label="Terms" href="/terms" />
@@ -326,7 +326,7 @@ function ToggleRow({ label, checked, onChange }: { label: string; checked: boole
 function Modal({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
-      <div className="w-full max-w-sm glass-panel border border-white/10 rounded-3xl p-6 pb-8 shadow-float animate-slide-up">
+      <div className="w-full max-w-sm bg-surface-raised border border-surface-border rounded-3xl p-6 pb-8 shadow-float animate-slide-up">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-extrabold">{title}</h2>
           <button onClick={onClose} className="p-2 rounded-full bg-white/5 hover:bg-white/10 text-white/70 active:scale-90 transition-transform" aria-label="Close">
