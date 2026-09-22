@@ -29,7 +29,7 @@ export const adminRoutes = Router();
 // it is handled exclusively through the authenticated client /verify flow.
 function verifyWebhookAuth(
   provider: string,
-  params: { signature?: string; apiKey?: string; body: any }
+  params: { signature?: string; apiKey?: string; body: any; rawBody?: string }
 ): boolean {
   const secret =
     provider === 'stripe'
@@ -44,7 +44,8 @@ function verifyWebhookAuth(
 
   // 1) HMAC signature verification over the serialized body (Stripe-style).
   if (params.signature && secret) {
-    const expected = crypto.createHmac('sha256', secret).update(JSON.stringify(params.body)).digest('hex');
+    const payload = params.rawBody || JSON.stringify(params.body);
+    const expected = crypto.createHmac('sha256', secret).update(payload).digest('hex');
     const received = params.signature;
     const a = Buffer.from(expected);
     const b = Buffer.from(String(received));
@@ -579,13 +580,13 @@ adminRoutes.post('/payments/webhook', async (req, res, next) => {
     // 1) Authorize the caller. Either a valid provider signature/HMAC or a
     //    configured shared webhook secret must be present. Without one, the
     //    request is rejected before any fulfillment can run.
-    const approved = await verifyWebhookAuth(provider, { signature, apiKey, body: req.body });
+    const approved = await verifyWebhookAuth(provider, { signature, apiKey, body: req.body, rawBody: (req as any).rawBody });
     if (!approved) {
       throw new ApiErrorResponse(401, 'UNAUTHORIZED', 'Invalid webhook credentials');
     }
 
     if (status === 'captured' || status === 'completed' || status === 'authorized') {
-      const result = await handlePaymentSuccess({ orderId, provider, providerPaymentId: paymentId, signature });
+      const result = await handlePaymentSuccess({ orderId, provider, providerPaymentId: paymentId, signature, rawBody: (req as any).rawBody });
       return res.json({ success: true, data: result });
     }
     if (status === 'failed' || status === 'cancelled') {

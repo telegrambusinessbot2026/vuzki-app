@@ -818,6 +818,7 @@ async function handleSendMessage(io: Server, socket: Socket, userId: string, pay
       mediaUrl,
       replyToId,
       giftId,
+      clientMessageId,
     } = payload || {};
 
     const conversation = await prisma.conversation.findUnique({ where: { id: conversationId } });
@@ -863,6 +864,7 @@ async function handleSendMessage(io: Server, socket: Socket, userId: string, pay
       mediaUrl,
       replyToId,
       giftId,
+      clientMessageId,
       onMessage: (dto) => {
         emitToUser(io, userId, 'message:received', dto);
         emitToUser(io, otherId, 'message:received', { ...dto, isMine: false });

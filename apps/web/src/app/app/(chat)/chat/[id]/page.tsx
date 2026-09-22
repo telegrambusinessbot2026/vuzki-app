@@ -215,7 +215,7 @@ export default function ChatRoomPage() {
   const send = (text: string) => {
     const t = text.trim();
     if (!t || !conversationId) return;
-    const localId = `optimistic_${Date.now()}`;
+    const localId = `optimistic_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     setMessages((m) => [
       ...m,
       {
@@ -238,7 +238,7 @@ export default function ChatRoomPage() {
     setInput('');
     emit(
       'message:send',
-      { conversationId, content: t },
+      { conversationId, content: t, clientMessageId: localId },
       (res: any) => {
         if (res?.ok && res.message) {
           const dto = res.message as ChatMessage;
@@ -253,10 +253,10 @@ export default function ChatRoomPage() {
   const sendGift = async (gift: Gift) => {
     if (!conversationId || giftSending) return;
     setGiftSending(true);
+    const localId = `optimistic_gift_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     try {
-      await post('/gifts/send', { receiverId: id, giftId: gift.id, contextType: 'chat', contextId: conversationId });
-      emit('message:send', { conversationId, type: 'GIFT', giftId: gift.id, content: '' });
-      const localId = `optimistic_gift_${Date.now()}`;
+      await post('/gifts/send', { receiverId: id, giftId: gift.id, contextType: 'chat', contextId: conversationId, clientRequestId: localId });
+      emit('message:send', { conversationId, type: 'GIFT', giftId: gift.id, content: '', clientMessageId: localId });
       setMessages((m) => [
         ...m,
         {
@@ -292,6 +292,7 @@ export default function ChatRoomPage() {
     if (!/^image\/(jpeg|png|webp|gif)$/.test(mime)) return;
     if (file.size > 8 * 1024 * 1024) return;
     const data = await readAsBase64(file);
+    const localId = `optimistic_file_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     try {
       const up = await post<{ url: string; key: string }>('/upload', {
         type: 'message_image',
@@ -299,7 +300,7 @@ export default function ChatRoomPage() {
         mime,
         data,
       });
-      emit('message:send', { conversationId, type: 'IMAGE', mediaUrl: up.url, content: '' });
+      emit('message:send', { conversationId, type: 'IMAGE', mediaUrl: up.url, content: '', clientMessageId: localId });
     } catch {
       /* ignore */
     }
@@ -412,9 +413,6 @@ export default function ChatRoomPage() {
       <div className="px-3 py-2.5 bg-surface-raised/95 backdrop-blur border-t border-surface-border pb-[calc(env(safe-area-inset-bottom)+10px)]">
         <div className="flex items-center gap-1.5">
           <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={handleFile} />
-          <button className="p-2 text-white/60 hover:text-white" aria-label="Emoji">
-            <EmojiIcon />
-          </button>
           <button className="p-2 text-white/60 hover:text-white" aria-label="Attach" onClick={() => fileRef.current?.click()}>
             <PaperclipIcon />
           </button>

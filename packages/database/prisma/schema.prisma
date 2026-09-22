@@ -334,7 +334,9 @@ model Message {
   deliveredAt    DateTime?
   readAt         DateTime?
   unsent         Boolean  @default(false)
+  clientMessageId String? @unique
   createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
   @@index([conversationId, createdAt])
   @@index([senderId])
   @@index([receiverId, status])

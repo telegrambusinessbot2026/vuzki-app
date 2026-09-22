@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => {
   const convFindUnique = vi.fn();
   const msgCreate = vi.fn();
   const msgUpdate = vi.fn();
+  const msgFindUnique = vi.fn();
   const convUpdate = vi.fn();
   const isBlockedPair = vi.fn();
   const moderateText = vi.fn();
@@ -13,6 +14,7 @@ const mocks = vi.hoisted(() => {
     convFindUnique,
     msgCreate,
     msgUpdate,
+    msgFindUnique,
     convUpdate,
     isBlockedPair,
     moderateText,
@@ -28,6 +30,7 @@ vi.mock('@vuzki/database', () => ({
       update: mocks.convUpdate,
     },
     message: {
+      findUnique: mocks.msgFindUnique,
       create: mocks.msgCreate,
       update: mocks.msgUpdate,
     },
@@ -125,6 +128,23 @@ describe('sendMessage pipeline', () => {
     expect(onMessage).toHaveBeenCalledTimes(1);
     expect(onMessage.mock.calls[0][0].id).toBe('m1');
     expect(result.message?.isMine).toBe(true);
+  });
+
+  it('handles clientMessageId deduplication (read before write)', async () => {
+    mocks.msgFindUnique.mockResolvedValueOnce({ id: 'existing1', clientMessageId: 'req1', status: 'SENT' });
+    const result = await sendMessage({ conversationId: 'c1', senderId: 'u1', content: 'hi', clientMessageId: 'req1' });
+    expect(result.alreadyProcessed).toBe(true);
+    expect(result.message?.id).toBe('existing1');
+    expect(mocks.msgCreate).not.toHaveBeenCalled();
+  });
+
+  it('handles concurrent P2002 collision gracefully', async () => {
+    mocks.msgFindUnique.mockResolvedValueOnce(null);
+    mocks.msgCreate.mockRejectedValueOnce({ code: 'P2002' });
+    mocks.msgFindUnique.mockResolvedValueOnce({ id: 'existing2', clientMessageId: 'req2', status: 'SENT' });
+    const result = await sendMessage({ conversationId: 'c1', senderId: 'u1', content: 'hi', clientMessageId: 'req2' });
+    expect(result.alreadyProcessed).toBe(true);
+    expect(result.message?.id).toBe('existing2');
   });
 });
 

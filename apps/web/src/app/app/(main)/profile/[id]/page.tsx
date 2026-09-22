@@ -173,7 +173,7 @@ export default function OtherProfilePage() {
       </div>
 
       <div className="flex gap-2">
-        <Link href="/app/gifts" className="flex-1">
+        <Link href={`/app/gifts?receiverId=${user.id}`} className="flex-1">
           <Button variant="outline" size="md" full icon={<GiftIcon size={18} />}>Send Gift</Button>
         </Link>
         <Button

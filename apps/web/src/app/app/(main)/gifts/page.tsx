@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Card, Chip, Divider } from '@/components/ui/Card';
 import { ArrowLeftIcon, CoinIcon, GiftIcon, HeartIcon } from '@/components/ui/Icons';
@@ -29,6 +30,9 @@ export default function GiftsPage() {
   const [categories, setCategories] = useState<string[]>(FALLBACK_CATEGORIES);
   const [error, setError] = useState('');
 
+  const searchParams = useSearchParams();
+  const receiverId = searchParams.get('receiverId');
+
   useEffect(() => {
     let cancelled = false;
     api<{ items: Gift[] }>('/gifts', { auth: true })
@@ -50,14 +54,27 @@ export default function GiftsPage() {
     [gifts, category]
   );
 
-  const sendGift = () => {
-    if (!selected || balance < selected.priceCoins) return;
-    setSent(true);
-    refresh();
-    setTimeout(() => {
-      setSent(false);
-      setSelected(null);
-    }, 1500);
+  const sendGift = async () => {
+    if (!selected || balance < selected.priceCoins || !receiverId) return;
+    try {
+      await api('/gifts/send', {
+        method: 'POST',
+        auth: true,
+        body: {
+          receiverId,
+          giftId: selected.id,
+          contextType: 'profile',
+        },
+      });
+      setSent(true);
+      refresh();
+      setTimeout(() => {
+        setSent(false);
+        setSelected(null);
+      }, 1500);
+    } catch (e) {
+      setError((e as Error)?.message || 'Failed to send gift');
+    }
   };
 
   return (
@@ -139,8 +156,9 @@ export default function GiftsPage() {
             </div>
             <p className="flex items-center gap-1 text-xs text-amber-400 font-semibold"><CoinIcon size={13} /> {selected.priceCoins} coins</p>
             {balance < selected.priceCoins && <p className="text-xs text-red-400">Not enough coins</p>}
+            {!receiverId && <p className="text-xs text-amber-400">Select a user profile first</p>}
           </div>
-          <Button size="sm" variant="gradient" onClick={sendGift} disabled={balance < selected.priceCoins}>
+          <Button size="sm" variant="gradient" onClick={sendGift} disabled={balance < selected.priceCoins || !receiverId}>
             <HeartIcon size={14} /> Send
           </Button>
         </div>

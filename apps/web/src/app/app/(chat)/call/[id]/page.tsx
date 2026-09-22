@@ -208,6 +208,11 @@ export default function CallScreen() {
 
   const initVideo = useCallback(async (callId: string, forOffer: boolean) => {
     const turnIceServers = turnServersRef.current ? await turnServersRef.current : [];
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      alert('Camera and microphone are not supported in this browser. Please ensure you are using HTTPS.');
+      setStatus('failed');
+      return;
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: true,
@@ -222,17 +227,26 @@ export default function CallScreen() {
         pushOffer();
         startOfferRetry();
       }
-    } catch {
-      /* permission denied - proceed without local media */
+    } catch (e: any) {
+      if (e.name === 'NotAllowedError') {
+        alert('Permission denied for camera/microphone.');
+      } else if (e.name === 'NotFoundError') {
+        alert('No camera or microphone found.');
+      } else if (e.name === 'NotReadableError') {
+        alert('Camera or microphone is already in use by another application.');
+      } else {
+        alert('Failed to access camera/microphone.');
+      }
+      setStatus('failed');
       const pc = setupPeer(callId, turnIceServers);
+      pc.close();
       if (forOffer) {
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        pushOffer();
-        startOfferRetry();
+        emit('call:cancel', { callId });
+      } else {
+        emit('call:end', { callId });
       }
     }
-  }, [type, setupPeer, pushOffer, startOfferRetry]);
+  }, [type, setupPeer, pushOffer, startOfferRetry, setStatus, emit]);
 
   // Main init
   useEffect(() => {
@@ -668,7 +682,6 @@ export default function CallScreen() {
             <div className="flex justify-center gap-3 mb-6">
               {[
                 { label: 'Gift', icon: <GiftIcon />, onClick: () => setShowGifts((s) => !s) },
-                { label: 'Chat', icon: <ChatDotIcon />, onClick: () => {} },
                 { label: 'Speaker', icon: <SpeakerIcon />, onClick: () => setSpeakerOn((v) => !v) },
                 { label: 'Report', icon: <FlagIcon />, onClick: report },
               ].map((b, i) => (

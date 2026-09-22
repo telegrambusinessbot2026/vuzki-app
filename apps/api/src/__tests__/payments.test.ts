@@ -116,4 +116,20 @@ describe('payments: webhook idempotency & coin credit', () => {
     });
     expect(mocks.walletTxCreate).not.toHaveBeenCalled();
   });
+
+  it('rejects invalid signature for secure provider', async () => {
+    await expect(handlePaymentSuccess({ orderId: 'VZ_ABC123', provider: 'stripe', signature: 'bad_sig', rawBody: 'foo' })).rejects.toMatchObject({
+      status: 400,
+      code: 'INVALID_SIGNATURE',
+    });
+    expect(mocks.walletUpsert).not.toHaveBeenCalled();
+  });
+
+  it('rejects missing rawBody for secure provider', async () => {
+    await expect(handlePaymentSuccess({ orderId: 'VZ_ABC123', provider: 'stripe', signature: 'some_sig', rawBody: '' })).rejects.toMatchObject({
+      status: 400,
+      code: 'INVALID_SIGNATURE',
+    });
+    expect(mocks.walletUpsert).not.toHaveBeenCalled();
+  });
 });

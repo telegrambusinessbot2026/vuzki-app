@@ -31,6 +31,7 @@ export interface SendMessageInput {
   mediaUrl?: string;
   replyToId?: string;
   giftId?: string;
+  clientMessageId?: string;
   /** called with the DTO after persist so the caller fans out to sockets */
   onMessage?: (dto: MessageDto) => void;
   /** explicit presence override for tests (otherwise uses socket registry) */
@@ -42,6 +43,7 @@ export interface SendMessageResult {
   error?: string;
   message?: MessageDto;
   deliveredAt?: string | null;
+  alreadyProcessed?: boolean;
 }
 
 /**
@@ -65,19 +67,40 @@ export async function sendMessage(input: SendMessageInput): Promise<SendMessageR
     }
   }
 
-  const record = await prisma.message.create({
-    data: {
-      conversationId: input.conversationId,
-      senderId: input.senderId,
-      receiverId: otherId,
-      type,
-      content: typeof input.content === 'string' ? input.content.slice(0, 4000) : '',
-      mediaUrl: input.mediaUrl,
-      replyToId: input.replyToId,
-      giftId: input.giftId,
-      status: 'SENT',
-    },
-  });
+  // Deduplication guard
+  if (input.clientMessageId) {
+    const existing = await prisma.message.findUnique({ where: { clientMessageId: input.clientMessageId } });
+    if (existing) {
+      return { ok: true, alreadyProcessed: true, message: toMessageDto(existing, input.senderId) };
+    }
+  }
+
+  let record;
+  try {
+    record = await prisma.message.create({
+      data: {
+        conversationId: input.conversationId,
+        senderId: input.senderId,
+        receiverId: otherId,
+        type,
+        content: typeof input.content === 'string' ? input.content.slice(0, 4000) : '',
+        mediaUrl: input.mediaUrl,
+        replyToId: input.replyToId,
+        giftId: input.giftId,
+        clientMessageId: input.clientMessageId,
+        status: 'SENT',
+      },
+    });
+  } catch (e: any) {
+    if (e.code === 'P2002' && input.clientMessageId) {
+      // Raced on unique constraint, fetch existing
+      const existing = await prisma.message.findUnique({ where: { clientMessageId: input.clientMessageId } });
+      if (existing) {
+        return { ok: true, alreadyProcessed: true, message: toMessageDto(existing, input.senderId) };
+      }
+    }
+    throw e;
+  }
 
   await prisma.conversation.update({ where: { id: input.conversationId }, data: { updatedAt: new Date() } });
 

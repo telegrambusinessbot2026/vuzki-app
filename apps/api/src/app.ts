@@ -44,7 +44,12 @@ export function createApp() {
     })
   );
 
-  app.use(express.json({ limit: '2mb' }));
+  app.use(express.json({ 
+    limit: '2mb',
+    verify: (req: any, res, buf) => {
+      req.rawBody = buf.toString();
+    }
+  }));
   app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
   // XSS sanitization of text-like fields on the request body.

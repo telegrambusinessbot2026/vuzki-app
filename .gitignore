@@ -8,6 +8,9 @@ out/
 build/
 .turbo/
 
+# Local-only tooling and data (portable Postgres etc.)
+.local/
+
 # Environment files
 .env
 .env.local
