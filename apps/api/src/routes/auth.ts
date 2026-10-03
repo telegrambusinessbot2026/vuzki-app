@@ -16,15 +16,15 @@ import {
   REFERRAL_REWARD_COINS,
   WalletTransactionType,
 } from '@vuzki/shared';
-import { verifyGoogleToken, verifyAppleToken } from '../services/oauth';
+import { verifyGoogleToken, verifyAppleToken, verifyFacebookToken } from '../services/oauth';
 
 export const authRoutes = Router();
 
 const registerSchema = z.object({
-  email: z.string().email().optional(),
+  email: z.string().email().transform(v => v.trim().toLowerCase()).optional(),
   phone: z.string().optional(),
   password: z.string().min(8).optional(),
-  provider: z.enum(['local', 'google', 'apple']).default('local'),
+  provider: z.enum(['local', 'google', 'apple', 'facebook']).default('local'),
   token: z.string().optional(), // Secure OAuth token
   providerId: z.string().optional(), // Legacy support
   name: z.string().optional(),
@@ -40,7 +40,7 @@ const registerSchema = z.object({
 // POST /auth/send-otp
 authRoutes.post('/send-otp', rateLimiter(15 * 60 * 1000, 8), wrap(async (req, res) => {
   const { identifier, purpose } = z.object({
-    identifier: z.string(),
+    identifier: z.string().transform(v => v.trim().toLowerCase()),
     purpose: z.enum(['registration', 'login', 'password_reset']),
   }).parse(req.body);
 
@@ -62,7 +62,7 @@ authRoutes.post('/register', rateLimiter(15 * 60 * 1000, 5), wrap(async (req, re
     }
     if (body.email && !isValidEmail(body.email)) throw new ApiErrorResponse(400, 'INVALID_EMAIL', 'Invalid email');
     if (body.phone && !isValidPhone(body.phone)) throw new ApiErrorResponse(400, 'INVALID_PHONE', 'Invalid phone');
-  } else if (body.provider === 'google' || body.provider === 'apple') {
+  } else if (body.provider === 'google' || body.provider === 'apple' || body.provider === 'facebook') {
     if (!body.token) throw new ApiErrorResponse(400, 'TOKEN_REQUIRED', 'OAuth token is required for social login');
     
     try {
@@ -71,10 +71,15 @@ authRoutes.post('/register', rateLimiter(15 * 60 * 1000, 5), wrap(async (req, re
         body.providerId = decoded.providerId;
         if (decoded.email) body.email = decoded.email;
         if (decoded.name && !body.name) body.name = decoded.name;
-      } else {
+      } else if (body.provider === 'apple') {
         const decoded = await verifyAppleToken(body.token);
         body.providerId = decoded.providerId;
         if (decoded.email) body.email = decoded.email;
+      } else if (body.provider === 'facebook') {
+        const decoded = await verifyFacebookToken(body.token);
+        body.providerId = decoded.providerId;
+        if (decoded.email) body.email = decoded.email;
+        if (decoded.name && !body.name) body.name = decoded.name;
       }
     } catch (err) {
       throw new ApiErrorResponse(401, 'INVALID_OAUTH_TOKEN', 'Failed to verify OAuth token');
@@ -208,7 +213,7 @@ async function loginExistingUser(res: any, user: any) {
 // POST /auth/login
 authRoutes.post('/login', rateLimiter(15 * 60 * 1000, 10), wrap(async (req, res) => {
   const { identifier, password, otp, pushToken } = z.object({
-    identifier: z.string(),
+    identifier: z.string().transform(v => v.trim().toLowerCase()).transform(v => v.trim().toLowerCase()),
     password: z.string().optional(),
     otp: z.string().optional(),
     pushToken: z.string().max(500).optional(),
@@ -221,7 +226,7 @@ authRoutes.post('/login', rateLimiter(15 * 60 * 1000, 10), wrap(async (req, res)
     },
   });
 
-  if (!user) throw new ApiErrorResponse(401, 'INVALID_CREDENTIALS', 'Invalid credentials');
+  if (!user) throw new ApiErrorResponse(401, 'INVALID_CREDENTIALS', 'The email or password is incorrect.');
 
   if (user.status === AccountStatus.BANNED) throw new ApiErrorResponse(403, 'BANNED', 'This account is banned');
   if (user.status === AccountStatus.SUSPENDED) throw new ApiErrorResponse(403, 'SUSPENDED', 'Account suspended');
@@ -233,7 +238,7 @@ authRoutes.post('/login', rateLimiter(15 * 60 * 1000, 10), wrap(async (req, res)
     });
   } else if (password) {
     if (!user.passwordHash || !(await verifyPassword(password, user.passwordHash))) {
-      throw new ApiErrorResponse(401, 'INVALID_CREDENTIALS', 'Invalid credentials');
+      throw new ApiErrorResponse(401, 'INVALID_CREDENTIALS', 'The email or password is incorrect.');
     }
   } else {
     throw new ApiErrorResponse(400, 'CREDENTIAL_REQUIRED', 'Password or OTP required');

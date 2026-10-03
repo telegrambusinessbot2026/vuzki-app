@@ -41,3 +41,19 @@ export async function verifyAppleToken(token: string): Promise<{ providerId: str
     throw new Error('Apple token verification failed');
   }
 }
+
+export async function verifyFacebookToken(token: string): Promise<{ providerId: string; email?: string; name?: string }> {
+  try {
+    const res = await fetch('https://graph.facebook.com/me?fields=id,name,email&access_token=' + token);
+    if (!res.ok) throw new Error('Invalid Facebook token');
+    const data: any = await res.json();
+    if (!data.id) throw new Error('Invalid Facebook token payload');
+    return {
+      providerId: data.id,
+      email: data.email,
+      name: data.name,
+    };
+  } catch (err) {
+    throw new Error('Facebook token verification failed');
+  }
+}

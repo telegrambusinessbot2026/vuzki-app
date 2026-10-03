@@ -51,6 +51,7 @@ interface AuthContextType {
   verifyOtp: (identifier: string, otp: string, purpose: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   loginWithApple: () => Promise<void>;
+  loginWithFacebook: () => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
   updateUser: (u: AuthUser) => void;
@@ -126,15 +127,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // authentication. Re-enable these (and the hidden UI buttons in the auth
   // pages) only after a real end-to-end OAuth flow exists.
   const loginWithGoogle = useCallback(async () => {
-    throw new Error(
-      'Google sign-in is not yet available. Use email/password or one-time code to log in.'
-    );
+    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+    if (!clientId) throw new Error('Google OAuth is BLOCKED: Missing NEXT_PUBLIC_GOOGLE_CLIENT_ID environment variable.');
+    const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(window.location.origin + '/auth/callback/google')}&response_type=id_token&scope=email profile&nonce=vuzki_nonce`;
+    window.location.href = url;
   }, []);
 
   const loginWithApple = useCallback(async () => {
-    throw new Error(
-      'Apple sign-in is not yet available. Use email/password or one-time code to log in.'
-    );
+    const clientId = process.env.NEXT_PUBLIC_APPLE_CLIENT_ID;
+    if (!clientId) throw new Error('Apple OAuth is BLOCKED: Missing NEXT_PUBLIC_APPLE_CLIENT_ID environment variable.');
+    const url = `https://appleid.apple.com/auth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(window.location.origin + '/auth/callback/apple')}&response_type=id_token&response_mode=form_post`;
+    window.location.href = url;
+  }, []);
+
+  const loginWithFacebook = useCallback(async () => {
+    const clientId = process.env.NEXT_PUBLIC_FACEBOOK_CLIENT_ID;
+    if (!clientId) throw new Error('Facebook OAuth is BLOCKED: Missing NEXT_PUBLIC_FACEBOOK_CLIENT_ID environment variable.');
+    const url = `https://www.facebook.com/v17.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(window.location.origin + '/auth/callback/facebook')}&response_type=token&scope=email,public_profile`;
+    window.location.href = url;
   }, []);
 
   const logout = useCallback(async () => {
@@ -160,6 +170,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         verifyOtp,
         loginWithGoogle,
         loginWithApple,
+        loginWithFacebook,
         logout,
         refresh,
         updateUser,
