@@ -136,7 +136,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loginWithApple = useCallback(async () => {
     const clientId = process.env.NEXT_PUBLIC_APPLE_CLIENT_ID;
     if (!clientId) throw new Error('Apple OAuth is BLOCKED: Missing NEXT_PUBLIC_APPLE_CLIENT_ID environment variable.');
-    const url = `https://appleid.apple.com/auth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(window.location.origin + '/auth/callback/apple')}&response_type=id_token&response_mode=form_post`;
+    const url = `https://appleid.apple.com/auth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(window.location.origin + '/auth/callback/apple')}&response_type=id_token&response_mode=fragment`;
     window.location.href = url;
   }, []);
 
