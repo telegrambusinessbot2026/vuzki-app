@@ -173,6 +173,19 @@ userRoutes.put('/me/profile', authenticate(), wrap(async (req: AuthedRequest, re
     }
   }
 
+  if (body.onboardingStep === 'COMPLETE') {
+    const currentUser = await prisma.user.findUnique({ where: { id: userId } });
+    if (!currentUser) throw new ApiErrorResponse(404, 'USER_NOT_FOUND', 'User not found');
+    
+    const finalDisplayName = body.displayName ?? currentUser.displayName;
+    const finalGender = body.gender ?? currentUser.gender;
+    const finalDob = dob ?? currentUser.dateOfBirth;
+    
+    if (!finalDisplayName || !finalGender || !finalDob) {
+      throw new ApiErrorResponse(400, 'INCOMPLETE_PROFILE', 'Cannot complete onboarding without Name, Gender, and Date of Birth');
+    }
+  }
+
   const user = await prisma.$transaction(async (tx) => {
     const updated = await tx.user.update({
       where: { id: userId },
@@ -321,24 +334,20 @@ userRoutes.post('/:id/super-like', authenticate(), wrap(async (req: AuthedReques
   res.json({ success: true });
 }));
 
+import { blockUser, unblockUser } from '../services/privacy';
+
 // PUT /users/:id/block
 userRoutes.put('/:id/block', authenticate(), wrap(async (req: AuthedRequest, res) => {
   const me = req.auth!.userId;
   const otherId = req.params.id;
   if (me === otherId) throw new ApiErrorResponse(400, 'BAD_REQUEST', 'Cannot block yourself');
-  await prisma.block.upsert({
-    where: { blockerId_blockedId: { blockerId: me, blockedId: otherId } },
-    update: {},
-    create: { blockerId: me, blockedId: otherId, reason: req.body?.reason },
-  });
+  await blockUser({ blockerId: me, blockedId: otherId, reason: req.body?.reason });
   res.json({ success: true });
 }));
 
 // DELETE /users/:id/block
 userRoutes.delete('/:id/block', authenticate(), wrap(async (req: AuthedRequest, res) => {
-  await prisma.block.deleteMany({
-    where: { blockerId: req.auth!.userId, blockedId: req.params.id },
-  });
+  await unblockUser(req.auth!.userId, req.params.id);
   res.json({ success: true });
 }));
 

@@ -17,6 +17,8 @@ interface CoinPack {
   isPopular: boolean;
 }
 
+import { PaymentModal, PaymentPayload } from '@/components/domain/PaymentModal';
+
 interface Txn {
   id: string;
   type: string;
@@ -31,8 +33,9 @@ export default function WalletPage() {
   const [packs, setPacks] = useState<CoinPack[]>([]);
   const [txns, setTxns] = useState<Txn[]>([]);
   const [purchased, setPurchased] = useState<string | null>(null);
+  const [activePayment, setActivePayment] = useState<{ orderId: string, provider: string, paymentPayload: PaymentPayload, amount: number, currency: string } | null>(null);
   const [claiming, setClaiming] = useState(false);
-  const [rewardClaimed, setRewardClaimed] = useState(false);
+  const [rewardStatus, setRewardStatus] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
 
   const loadWallet = useCallback(async () => {
@@ -46,8 +49,8 @@ export default function WalletPage() {
       setPacks(p.items ?? []);
       setTxns(h.items ?? []);
       try {
-        const r = await api<{ claimedToday: boolean }>('/rewards/daily', { auth: true });
-        setRewardClaimed(r.claimedToday);
+        const r = await api<any>('/rewards/daily', { auth: true });
+        setRewardStatus(r.data);
       } catch {
         /* reward endpoint optional */
       }
@@ -64,24 +67,33 @@ export default function WalletPage() {
     setPurchased(p.id);
     setError(null);
     try {
-      const order = await api<{ orderId: string; provider: string }>('/wallet/purchase', {
+      const order = await api<{ orderId: string; provider: string; paymentPayload?: PaymentPayload }>('/wallet/purchase', {
         method: 'POST',
         body: { packageId: p.id },
         auth: true,
       });
-      // Fulfill the order (demo mode server-side). In production a real
-      // redirect/checkout occurs and the webhook fulfills; this verify call is
-      // only honored when the server is genuinely in demo mode.
+
+      if (order.provider.toUpperCase() === 'PHONEPE' && order.paymentPayload?.qrString) {
+        setActivePayment({
+          orderId: order.orderId,
+          provider: order.provider,
+          paymentPayload: order.paymentPayload,
+          amount: p.price,
+          currency: p.currency,
+        });
+        return;
+      }
+
+      // Legacy fallback for other providers/demo
       await api('/wallet/verify', {
         method: 'POST',
         body: { orderId: order.orderId, provider: order.provider, demo: true },
         auth: true,
-      }).catch(() => {
-        /* in production the webhook handles fulfillment */
-      });
+      }).catch(() => {});
+      
       await loadWallet();
     } catch {
-      setError('Purchase could not be completed.');
+      setError('Purchase could not be initiated.');
     } finally {
       setPurchased(null);
     }
@@ -91,7 +103,6 @@ export default function WalletPage() {
     setClaiming(true);
     try {
       await api('/rewards/daily/claim', { method: 'POST', body: {}, auth: true });
-      setRewardClaimed(true);
       await loadWallet();
     } catch {
       setError('Reward already claimed today or could not be claimed.');
@@ -141,15 +152,40 @@ export default function WalletPage() {
       </div>
 
       <div className="relative rounded-2xl overflow-hidden bg-gradient-to-r from-amber-400 to-yellow-300 mb-5">
-        <div className="p-4 flex items-center justify-between">
-          <div>
-            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-900/70 mb-1"><SparkleIcon size={10} /> DAILY REWARD</span>
-            <p className="font-bold text-black">Claim your free daily coins!</p>
-            <p className="text-[11px] text-amber-900/70">Come back daily to keep your streak</p>
+        <div className="p-4">
+          <div className="flex items-start justify-between mb-2">
+            <div>
+              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-900/70 mb-1"><SparkleIcon size={10} /> DAILY REWARD</span>
+              <p className="font-bold text-black">Claim your free daily coins!</p>
+              <p className="text-[11px] text-amber-900/70">
+                 {rewardStatus?.streak ? `🔥 ${rewardStatus.streak} day streak!` : 'Come back daily to keep your streak'}
+              </p>
+            </div>
+            <Button size="sm" variant="primary" className="bg-black text-amber-300 hover:bg-black/90 whitespace-nowrap ml-4" loading={claiming} disabled={!rewardStatus || rewardStatus.claimedToday} onClick={claimDaily}>
+              <ZapIcon size={14} /> {rewardStatus?.claimedToday ? 'Claimed' : 'Claim'}
+            </Button>
           </div>
-          <Button size="sm" variant="primary" className="bg-black text-amber-300 hover:bg-black/90" loading={claiming} disabled={rewardClaimed} onClick={claimDaily}>
-            <ZapIcon size={14} /> {rewardClaimed ? 'Claimed' : 'Claim'}
-          </Button>
+          
+          {rewardStatus && rewardStatus.schedule && (
+            <div className="flex items-center gap-1 mt-3 w-full overflow-x-auto pb-1 no-scrollbar">
+              {rewardStatus.schedule.map((coins: number, idx: number) => {
+                const day = idx + 1;
+                const isClaimed = rewardStatus.claimedToday ? day <= rewardStatus.streak : day <= rewardStatus.streak; 
+                const isToday = rewardStatus.claimedToday ? day === rewardStatus.streak : day === rewardStatus.streak + 1;
+                
+                let bgCls = 'bg-black/10 text-amber-900/40';
+                if (isClaimed) bgCls = 'bg-amber-600 text-amber-100';
+                else if (isToday) bgCls = 'bg-white text-black border border-black/10 shadow-sm';
+
+                return (
+                  <div key={idx} className={`flex flex-col items-center justify-center p-1.5 rounded-lg min-w-[42px] ${bgCls}`}>
+                    <span className="text-[9px] font-bold opacity-70">Day {day}</span>
+                    <span className="text-[11px] font-black flex items-center gap-0.5 mt-0.5"><CoinIcon size={9} />{coins}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 
@@ -209,6 +245,21 @@ export default function WalletPage() {
         })}
       </Card>
       <Divider className="my-4" />
+
+      {activePayment && (
+        <PaymentModal
+          orderId={activePayment.orderId}
+          provider={activePayment.provider}
+          paymentPayload={activePayment.paymentPayload}
+          amount={activePayment.amount}
+          currency={activePayment.currency}
+          onSuccess={() => {
+            setActivePayment(null);
+            loadWallet();
+          }}
+          onCancel={() => setActivePayment(null)}
+        />
+      )}
     </div>
   );
 }

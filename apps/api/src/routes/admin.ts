@@ -95,6 +95,45 @@ adminRoutes.get('/me', requireAdmin, wrap(async (req: AdminRequest, res) => {
   res.json({ success: true, data: { admin: { id: admin!.id, name: admin!.name, email: admin!.email, role: admin!.role } } });
 }));
 
+
+// ============ AUDIT LOGS ============
+
+// GET /admin/audit-logs
+adminRoutes.get('/audit-logs', requireAdmin, requirePermission('audit.read'), wrap(async (req: AdminRequest, res) => {
+  const { page = '1', limit = '50' } = req.query;
+  const p = Math.max(1, parseInt(page as string, 10) || 1);
+  const l = Math.min(100, Math.max(1, parseInt(limit as string, 10) || 50));
+  
+  const [items, total] = await Promise.all([
+    prisma.auditLog.findMany({
+      orderBy: { createdAt: 'desc' },
+      skip: (p - 1) * l,
+      take: l,
+      select: {
+        id: true,
+        createdAt: true,
+        actorId: true,
+        actorType: true,
+        action: true,
+        entityType: true,
+        entityId: true,
+        metadata: true,
+      }
+    }),
+    prisma.auditLog.count()
+  ]);
+  
+  res.json({
+    success: true,
+    data: {
+      items,
+      total,
+      page: p,
+      pageSize: l
+    }
+  });
+}));
+
 // ============ DASHBOARD ============
 
 // GET /admin/dashboard
@@ -136,19 +175,39 @@ adminRoutes.get('/dashboard', requireAdmin, requirePermission('analytics.read'),
 adminRoutes.get('/analytics', requireAdmin, requirePermission('analytics.read'), wrap(async (req: AdminRequest, res) => {
   const { range = '30d' } = z.object({ range: z.string().default('30d') }).parse(req.query ?? {});
   const days = range === '7d' ? 7 : 30;
-  const from = new Date();
-  from.setDate(from.getDate() - days);
+  const today = new Date();
+  const from = new Date(today);
+  from.setDate(from.getDate() - days + 1);
+  from.setHours(0, 0, 0, 0);
 
-  const signups = await prisma.user.groupBy({
-    by: ['createdAt'],
-    where: { createdAt: { gte: from } },
-    _count: true,
-  });
-  const calls = await prisma.call.groupBy({ by: ['createdAt'], where: { createdAt: { gte: from } }, _count: true });
-  const messages = await prisma.message.groupBy({ by: ['createdAt'], where: { createdAt: { gte: from } }, _count: true });
-  const payments = await prisma.payment.findMany({ where: { createdAt: { gte: from }, status: 'COMPLETED' }, select: { amount: true, createdAt: true } });
+  const [signups, calls, messages, payments] = await Promise.all([
+    prisma.$queryRaw<Array<{ day: Date; count: number }>>`
+      SELECT DATE("createdAt") as day, COUNT(*)::int as count 
+      FROM "User" 
+      WHERE "createdAt" >= ${from} 
+      GROUP BY DATE("createdAt")
+    `,
+    prisma.$queryRaw<Array<{ day: Date; count: number }>>`
+      SELECT DATE("createdAt") as day, COUNT(*)::int as count 
+      FROM "Call" 
+      WHERE "createdAt" >= ${from} 
+      GROUP BY DATE("createdAt")
+    `,
+    prisma.$queryRaw<Array<{ day: Date; count: number }>>`
+      SELECT DATE("createdAt") as day, COUNT(*)::int as count 
+      FROM "Message" 
+      WHERE "createdAt" >= ${from} 
+      GROUP BY DATE("createdAt")
+    `,
+    prisma.$queryRaw<Array<{ day: Date; amount: number }>>`
+      SELECT DATE("createdAt") as day, SUM(amount) as amount 
+      FROM "Payment" 
+      WHERE "createdAt" >= ${from} AND status = 'COMPLETED' 
+      GROUP BY DATE("createdAt")
+    `
+  ]);
 
-  const series = (data: { createdAt: Date; _count?: number; amount?: number }[], key: 'count' | 'amount') => {
+  const series = (data: any[], key: 'count' | 'amount') => {
     const out: Record<string, number> = {};
     for (let i = days - 1; i >= 0; i--) {
       const d = new Date(from);
@@ -156,10 +215,15 @@ adminRoutes.get('/analytics', requireAdmin, requirePermission('analytics.read'),
       out[d.toISOString().slice(0, 10)] = 0;
     }
     for (const row of data) {
-      const day = new Date(row.createdAt).toISOString().slice(0, 10);
-      out[day] = (out[day] || 0) + (key === 'count' ? row._count ?? 1 : row.amount ?? 0);
+      if (!row) continue;
+      const dateVal = row.day || row.createdAt;
+      if (!dateVal) continue;
+      let day;
+      try { day = new Date(dateVal).toISOString().slice(0, 10); } catch(e) { continue; }
+      const val = key === 'count' ? (row.count ?? row._count ?? 1) : (row.amount ?? 0);
+      out[day] = (out[day] || 0) + val;
     }
-    return Object.entries(out).map(([date, value]) => ({ date, value }));
+    return Object.keys(out).sort().map(date => ({ date, value: out[date] }));
   };
 
   res.json({
@@ -264,6 +328,17 @@ adminRoutes.patch('/users/:id', requireAdmin, requirePermission('users.write'), 
       days,
       adminId: req.admin!.adminId,
     });
+    
+    await prisma.auditLog.create({
+      data: {
+        actorId: req.admin!.adminId,
+        actorType: 'ADMIN',
+        action: `user:${action}`,
+        entityType: 'User',
+        entityId: req.params.id,
+        metadata: { reason, days, note }
+      }
+    });
     return res.json({ success: true, data: { updated: action } });
   }
 
@@ -281,6 +356,17 @@ adminRoutes.patch('/users/:id', requireAdmin, requirePermission('users.write'), 
         days,
         metadata: { note },
       },
+    });
+
+    await tx.auditLog.create({
+      data: {
+        actorId: req.admin!.adminId,
+        actorType: 'ADMIN',
+        action: `user:${action}`,
+        entityType: 'User',
+        entityId: req.params.id,
+        metadata: { reason, days, note }
+      }
     });
   });
 
@@ -397,12 +483,22 @@ adminRoutes.patch('/reports/:id', requireAdmin, requirePermission('reports.write
           adminId: req.admin!.adminId,
         });
       } else {
-        await tx.moderationAction.create({
-          data: { userId: report.reportedUserId, actionType, severity: 'MEDIUM', reason: note, adminId: req.admin!.adminId, days: days ?? null },
-        });
+          await tx.moderationAction.create({
+            data: { userId: report.reportedUserId, actionType, severity: 'MEDIUM', reason: note, adminId: req.admin!.adminId, days: days ?? null },
+          });
+        }
       }
-    }
-  });
+      await tx.auditLog.create({
+        data: {
+          actorId: req.admin!.adminId,
+          actorType: 'ADMIN',
+          action: `report:${decision}`,
+          entityType: 'Report',
+          entityId: report.id,
+          metadata: { note, actionType, banUser, days }
+        }
+      });
+    });
 
   res.json({ success: true, data: { status: statusMap[decision] } });
 }));
@@ -640,7 +736,17 @@ adminRoutes.get('/moderation-cases', requireAdmin, requirePermission('moderation
 adminRoutes.patch('/moderation-cases/:id', requireAdmin, requirePermission('moderation.write'), wrap(async (req: AdminRequest, res) => {
   const { decision, note } = z.object({ decision: z.enum(['RESOLVED', 'DISMISSED', 'ESCALATED']), note: z.string().optional() }).parse(req.body);
   const updated = await decideCase({ caseId: req.params.id, decision, note, adminId: req.admin!.adminId });
-  res.json({ success: true, data: { caseId: updated.id, status: decision } });
+    await prisma.auditLog.create({
+      data: {
+        actorId: req.admin!.adminId,
+        actorType: 'ADMIN',
+        action: `moderation_case:${decision}`,
+        entityType: 'ModerationCase',
+        entityId: updated.id,
+        metadata: { note }
+      }
+    });
+    res.json({ success: true, data: { caseId: updated.id, status: decision } });
 }));
 
 // GET /admin/fraud-flags - fraud investigation queue
@@ -656,7 +762,7 @@ adminRoutes.patch('/fraud-flags/:id', requireAdmin, requirePermission('flags.wri
 }));
 
 // GET /admin/content-flags - content moderation review queue
-adminRoutes.get('/content-flags', requireAdmin, requirePermission('moderation.write'), wrap(async (req: AdminRequest, res) => {
+adminRoutes.get('/content-flags', requireAdmin, requirePermission('moderation.read'), wrap(async (req: AdminRequest, res) => {
   const q = z.object({ status: z.string().optional(), page: z.coerce.number().optional(), limit: z.coerce.number().optional() }).parse(req.query);
   res.json({ success: true, data: await listContentFlags(q) });
 }));
@@ -668,7 +774,7 @@ adminRoutes.patch('/content-flags/:id', requireAdmin, requirePermission('moderat
 }));
 
 // GET /admin/appeals - user appeal review queue
-adminRoutes.get('/appeals', requireAdmin, requirePermission('moderation.write'), wrap(async (req: AdminRequest, res) => {
+adminRoutes.get('/appeals', requireAdmin, requirePermission('moderation.read'), wrap(async (req: AdminRequest, res) => {
   const q = z.object({ status: z.string().optional(), page: z.coerce.number().optional(), limit: z.coerce.number().optional() }).parse(req.query);
   res.json({ success: true, data: await listAppeals(q) });
 }));

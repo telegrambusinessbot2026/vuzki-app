@@ -48,15 +48,6 @@ function verifyWebhookSignature(provider: string, payload: string, signature: st
       hmac.update(payload);
       digest = hmac.digest('hex');
       return signature === digest;
-    case PaymentProvider.PHONEPE:
-      // PhonePe callback signature: phonepepay_sha256=<hex_hmac>
-      // using salt_key and salt_index from config
-      if (!signature || !config.phonepeSaltKey || !config.phonepeSaltIndex) return false;
-      const message = payload + config.phonepeSaltKey;
-      hmac = crypto.createHmac('sha256', config.phonepeSaltKey);
-      hmac.update(message);
-      digest = hmac.digest('hex');
-      return signature.toLowerCase() === digest.toLowerCase();
     case PaymentProvider.STRIPE:
       // Stripe signature: t={timestamp}, v1=<signature>
       // sig_header format: t={timestamp},v1=<signature>
@@ -172,16 +163,40 @@ export async function createCoinsOrder(userId: string, packageId: string, provid
   } else if (activeProviderN === PaymentProvider.RAZORPAY && config.razorpayKeyId && config.razorpayKeySecret) {
     // Razorpay order creation
     paymentPayload = { key: config.razorpayKeyId, orderId, amount: Math.round(amount * 100), currency: pkg.currency, name: 'VUZKI Coins' };
-  } else if (activeProviderN === PaymentProvider.PHONEPE && config.phonepeMerchantId && config.phonepeClientId && config.phonepeClientSecret) {
-    // PhonePe order creation
-    paymentPayload = { merchantId: config.phonepeMerchantId, orderId, amount: Math.round(amount * 100), currency: pkg.currency, name: 'VUZKI Coins' };
+  } else if (activeProviderN === PaymentProvider.PHONEPE && config.phonepeMerchantId) {
+    const { initDynamicQR } = await import('./phonepe');
+    const qrResult = await initDynamicQR({
+      transactionId: orderId,
+      amountPaise: Math.round(amount * 100),
+    });
+
+    // Update payment record with the provider response data
+    await prisma.payment.update({
+      where: { id: payment.id },
+      data: {
+        providerPaymentId: qrResult.transactionId,
+        metadata: {
+          ...(payment.metadata as object),
+          qrString: qrResult.qrString,
+        } as any,
+      }
+    });
+
+    paymentPayload = { 
+      merchantId: qrResult.merchantId, 
+      transactionId: qrResult.transactionId,
+      amount: qrResult.amount, 
+      qrString: qrResult.qrString,
+      message: qrResult.message,
+      expiresIn: 1800,
+    };
   } else if (activeProviderN === PaymentProvider.STRIPE && config.stripeSecretKey) {
     paymentPayload = { orderId, amount, currency: pkg.currency, purpose: 'coins' };
   } else if (activeProviderN === PaymentProvider.CASHFREE && config.cashfreeClientId) {
     paymentPayload = { orderId, amount, currency: pkg.currency, name: 'VUZKI Coins' };
   }
 
-  return { orderId, amount, currency: pkg.currency, coins: pkg.coins + pkg.bonusCoins, provider: activeProvider, paymentPayload };
+  return { orderId, amount, currency: pkg.currency, coins: pkg.coins + pkg.bonusCoins, provider: activeProvider, status: payment.status, paymentPayload };
 }
 
 // Called by the payment provider webhook (server-to-server) - TRUSTED after signature verification.

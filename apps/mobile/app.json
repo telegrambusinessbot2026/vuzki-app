@@ -1,0 +1,90 @@
+{
+    "expo":  {
+                 "name":  "VUZKI",
+                 "slug":  "vuzki-mobile",
+                 "version":  "1.0.0",
+                 "orientation":  "portrait",
+                 "icon":  "./assets/icon.png",
+                 "scheme":  "vuzki",
+                 "userInterfaceStyle":  "dark",
+                 "splash":  {
+                                "image":  "./assets/splash-icon.png",
+                                "resizeMode":  "contain",
+                                "backgroundColor":  "#0f0f14"
+                            },
+                 "ios":  {
+                             "supportsTablet":  true,
+                             "bundleIdentifier":  "com.vuzki.app",
+                             "infoPlist":  {
+                                               "UIBackgroundModes":  [
+                                                                         "fetch",
+                                                                         "remote-notification",
+                                                                         "voip",
+                                                                         "fetch",
+                                                                         "remote-notification",
+                                                                         "voip"
+                                                                     ],
+                                               "NSCameraUsageDescription":  "VUZKI needs camera access for video calls.",
+                                               "NSMicrophoneUsageDescription":  "VUZKI needs microphone access for calls.",
+                                               "ITSAppUsesNonExemptEncryption":  false
+                                           },
+                             "googleServicesFile":  "./GoogleService-Info.plist",
+                             "bitcode":  false
+                         },
+                 "android":  {
+                                 "package":  "com.vuzki.app",
+                                 "adaptiveIcon":  {
+                                                      "foregroundImage":  "./assets/android-icon-foreground.png",
+                                                      "backgroundColor":  "#0f0f14"
+                                                  },
+                                 "permissions":  [
+                                                     "android.permission.RECEIVE_BOOT_COMPLETED",
+                                                     "android.permission.VIBRATE",
+                                                     "android.permission.USE_FULL_SCREEN_INTENT",
+                                                     "android.permission.WAKE_LOCK",
+                                                     "android.permission.RECORD_AUDIO",
+                                                     "android.permission.CAMERA",
+                                                     "android.permission.READ_PHONE_STATE",
+                                                     "android.permission.CALL_PHONE"
+                                                 ],
+                                 "googleServicesFile":  "./google-services.json"
+                             },
+                 "plugins":  [
+                                 "expo-router",
+                                 [
+                                     "@react-native-firebase/app",
+                                     {
+                                         "ios":  {
+                                                     "disableSPM":  true
+                                                 }
+                                     }
+                                 ],
+                                 [
+                                     "@config-plugins/react-native-webrtc",
+                                     {
+                                         "cameraPermission":  "Allow VUZKI to access your camera",
+                                         "microphonePermission":  "Allow VUZKI to access your microphone"
+                                     }
+                                 ],
+                                 "@config-plugins/react-native-callkeep",
+                                 [
+                                     "expo-build-properties",
+                                     {
+                                         "ios":  {
+                                                     "useFrameworks":  "static"
+                                                 }
+                                     }
+                                 ]
+                             ],
+                 "extra":  {
+                               "router":  {
+
+                                          },
+                               "eas":  {
+                                           "projectId":  "1a59074d-48e1-4f80-9532-80bcccd9ce37"
+                                       }
+                           },
+                 "owner":  "vuzki",
+                 "newArchEnabled":  false
+             }
+}

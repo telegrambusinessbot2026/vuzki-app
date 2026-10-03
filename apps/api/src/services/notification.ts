@@ -1,5 +1,6 @@
 import { prisma } from '@vuzki/database';
 import { NotificationType } from '@vuzki/shared';
+import { dispatchPushNotification } from './fcm';
 
 // Creates a notification record and emits to online user via socket.
 export async function notify(params: {
@@ -19,14 +20,35 @@ export async function notify(params: {
     },
   });
 
-  emitToUser(params.userId, 'notification', {
-    id: notification.id,
-    type: notification.type,
-    title: notification.title,
-    body: notification.body,
-    data: notification.data ?? {},
-    createdAt: notification.createdAt,
-  });
+  const ids = getSocketIds(params.userId);
+  if (ids.length > 0) {
+    emitToUser(params.userId, 'notification', {
+      id: notification.id,
+      type: notification.type,
+      title: notification.title,
+      body: notification.body,
+      data: notification.data ?? {},
+      createdAt: notification.createdAt,
+    });
+  } else {
+    // User is offline, check for active sessions with push tokens
+    const sessions = await prisma.session.findMany({
+      where: { userId: params.userId, isActive: true, pushToken: { not: null } },
+      select: { pushToken: true },
+    });
+    const tokens = sessions.map((s: { pushToken: string | null }) => s.pushToken).filter(Boolean) as string[];
+    if (tokens.length > 0) {
+      const stringifiedData: Record<string, string> = {};
+      if (params.data) {
+        for (const [k, v] of Object.entries(params.data)) {
+          stringifiedData[k] = typeof v === 'string' ? v : JSON.stringify(v);
+        }
+      }
+      stringifiedData.type = params.type;
+      
+      await dispatchPushNotification(tokens, params.title, params.body, stringifiedData);
+    }
+  }
 
   return notification;
 }

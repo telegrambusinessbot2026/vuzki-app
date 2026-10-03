@@ -208,6 +208,7 @@ model Session {
   userId      String
   user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   refreshToken String @unique
+  pushToken   String?
   deviceName  String?
   deviceType  String?
   ipAddress   String?

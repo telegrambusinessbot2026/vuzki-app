@@ -16,6 +16,7 @@ import {
   REFERRAL_REWARD_COINS,
   WalletTransactionType,
 } from '@vuzki/shared';
+import { verifyGoogleToken, verifyAppleToken } from '../services/oauth';
 
 export const authRoutes = Router();
 
@@ -24,11 +25,13 @@ const registerSchema = z.object({
   phone: z.string().optional(),
   password: z.string().min(8).optional(),
   provider: z.enum(['local', 'google', 'apple']).default('local'),
-  providerId: z.string().optional(),
+  token: z.string().optional(), // Secure OAuth token
+  providerId: z.string().optional(), // Legacy support
   name: z.string().optional(),
   username: z.string().optional(),
   gender: z.string().optional(),
-  age: z.number().int().min(18).max(120).optional(),
+  dob: z.string().optional(), // ISO string YYYY-MM-DD
+  age: z.number().int().min(18).max(120).optional(), // Legacy support
   countryCode: z.string().max(3).optional(),
   referralCode: z.string().optional(),
   otp: z.string().optional(),
@@ -60,10 +63,27 @@ authRoutes.post('/register', rateLimiter(15 * 60 * 1000, 5), wrap(async (req, re
     if (body.email && !isValidEmail(body.email)) throw new ApiErrorResponse(400, 'INVALID_EMAIL', 'Invalid email');
     if (body.phone && !isValidPhone(body.phone)) throw new ApiErrorResponse(400, 'INVALID_PHONE', 'Invalid phone');
   } else if (body.provider === 'google' || body.provider === 'apple') {
-    if (!body.providerId) throw new ApiErrorResponse(400, 'PROVIDER_ID_REQUIRED', 'Provider ID required');
+    if (!body.token) throw new ApiErrorResponse(400, 'TOKEN_REQUIRED', 'OAuth token is required for social login');
+    
+    try {
+      if (body.provider === 'google') {
+        const decoded = await verifyGoogleToken(body.token);
+        body.providerId = decoded.providerId;
+        if (decoded.email) body.email = decoded.email;
+        if (decoded.name && !body.name) body.name = decoded.name;
+      } else {
+        const decoded = await verifyAppleToken(body.token);
+        body.providerId = decoded.providerId;
+        if (decoded.email) body.email = decoded.email;
+      }
+    } catch (err) {
+      throw new ApiErrorResponse(401, 'INVALID_OAUTH_TOKEN', 'Failed to verify OAuth token');
+    }
+    
+    if (!body.providerId) throw new ApiErrorResponse(400, 'PROVIDER_ID_REQUIRED', 'Provider ID missing from token');
+    
     const existing = await prisma.user.findFirst({ where: { authProvider: body.provider, providerId: body.providerId } });
     if (existing) {
-      // log them in
       return loginExistingUser(res, existing);
     }
   }
@@ -82,9 +102,24 @@ authRoutes.post('/register', rateLimiter(15 * 60 * 1000, 5), wrap(async (req, re
 
   let username = await generateUniqueUsername((body.username || body.name || 'user').toLowerCase());
 
-  // Derive dateOfBirth from `age` (year-accurate; the user can refine later).
-  const dateOfBirth: Date | undefined =
-    typeof body.age === 'number' ? new Date(new Date().getFullYear() - body.age, 0, 1) : undefined;
+  // Enforce DOB age restriction server-side
+  let dateOfBirth: Date | undefined = undefined;
+  if (body.dob) {
+    dateOfBirth = new Date(body.dob);
+    if (!isAdult(dateOfBirth)) {
+      throw new ApiErrorResponse(403, 'UNDERAGE', 'You must be at least 18 years old to use VUZKI');
+    }
+  } else if (typeof body.age === 'number') {
+    dateOfBirth = new Date(new Date().getFullYear() - body.age, 0, 1);
+    if (!isAdult(dateOfBirth)) {
+      throw new ApiErrorResponse(403, 'UNDERAGE', 'You must be at least 18 years old to use VUZKI');
+    }
+  } else {
+    // If local provider and no DOB/age is provided, block it.
+    if (body.provider === 'local') {
+      throw new ApiErrorResponse(400, 'DOB_REQUIRED', 'Date of birth is required');
+    }
+  }
 
   // reward referrer if referral code present
   const referralCode = (body.referralCode || (req.body.referralCode as string) || '').toUpperCase() || null;
@@ -125,7 +160,7 @@ authRoutes.post('/register', rateLimiter(15 * 60 * 1000, 5), wrap(async (req, re
     checkReferralFraud({ referrerId: referrer.id, referredUserId: user.id, deviceId: req.body.deviceId, ipAddress: req.ip }).catch(() => {});
   }
 
-  const session = await createSession(user.id, req);
+  const session = await createSession(user.id, req, req.body.pushToken);
 
   const tokens = issueTokens({ userId: user.id, sessionId: session.id });
 
@@ -155,7 +190,7 @@ async function loginExistingUser(res: any, user: any) {
   // created before profile auto-creation existed. Safe for every user and
   // idempotent: only missing rows are created, production data is untouched.
   await ensureProfileRows(user.id);
-  const session = await createSession(user.id, res.req);
+  const session = await createSession(user.id, res.req, res.req.body?.pushToken);
   const tokens = issueTokens({ userId: user.id, sessionId: session.id });
   const full = await prisma.user.findUnique({ where: { id: user.id }, include: { profile: true, wallet: true, preferences: true, subscriptions: { where: { status: 'ACTIVE' } } } });
   const needsOnboarding = user.onboardingStep !== OnboardingStep.COMPLETE;
@@ -172,10 +207,11 @@ async function loginExistingUser(res: any, user: any) {
 
 // POST /auth/login
 authRoutes.post('/login', rateLimiter(15 * 60 * 1000, 10), wrap(async (req, res) => {
-  const { identifier, password, otp } = z.object({
+  const { identifier, password, otp, pushToken } = z.object({
     identifier: z.string(),
     password: z.string().optional(),
     otp: z.string().optional(),
+    pushToken: z.string().max(500).optional(),
   }).parse(req.body);
 
   const user = await prisma.user.findFirst({
@@ -205,7 +241,7 @@ authRoutes.post('/login', rateLimiter(15 * 60 * 1000, 10), wrap(async (req, res)
 
   await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
 
-  const session = await createSession(user.id, req);
+  const session = await createSession(user.id, req, req.body.pushToken);
   const tokens = issueTokens({ userId: user.id, sessionId: session.id });
   const full = await prisma.user.findUnique({ where: { id: user.id }, include: { profile: true, wallet: true, preferences: true, subscriptions: { where: { status: 'ACTIVE' } } } });
   const needsOnboarding = user.onboardingStep !== OnboardingStep.COMPLETE;
@@ -221,12 +257,13 @@ authRoutes.post('/login', rateLimiter(15 * 60 * 1000, 10), wrap(async (req, res)
   });
 }));
 
-async function createSession(userId: string, req: any) {
+async function createSession(userId: string, req: any, pushToken?: string) {
   const token = signRefreshToken({ userId, sessionId: 'pending' });
   const session = await prisma.session.create({
     data: {
       userId,
       refreshToken: token,
+      pushToken: pushToken || null,
       deviceName: req.headers['user-agent']?.slice(0, 200) || 'unknown',
       deviceType: 'web',
       ipAddress: req.ip,

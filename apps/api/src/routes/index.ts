@@ -15,6 +15,8 @@ import { notificationRoutes } from './notifications';
 import { searchRoutes } from './search';
 import { miscRoutes } from './misc';
 import { adminRoutes } from './admin';
+import { webhookRoutes } from './webhooks';
+import { paymentRoutes } from './payments';
 
 export const routes = Router();
 
@@ -33,4 +35,6 @@ routes.use('/reports', reportRoutes);
 routes.use('/notifications', notificationRoutes);
 routes.use('/search', searchRoutes);
 routes.use('/admin', adminRoutes);
+routes.use('/webhooks', webhookRoutes);
+routes.use('/payments', paymentRoutes);
 routes.use('/', miscRoutes);

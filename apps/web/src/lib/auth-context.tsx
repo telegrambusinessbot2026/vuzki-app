@@ -71,7 +71,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const data = await api<{ user: AuthUser }>('/auth/me', { auth: true });
       setUser(data.user);
     } catch {
-      clearTokens();
+      clearTokens(); window.localStorage.removeItem('fcmToken');
       setUser(null);
     } finally {
       setLoading(false);
@@ -83,9 +83,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [refresh]);
 
   const login = useCallback(async (identifier: string, password?: string, otp?: string) => {
+    let pushToken;
+    try {
+      const { getWebPushToken } = await import('./firebase');
+      pushToken = await getWebPushToken(); if (pushToken) window.localStorage.setItem('fcmToken', pushToken);
+    } catch(e) {
+      // Ignored if unsupported
+    }
     const data = await api<{ user: AuthUser; tokens: { accessToken: string; refreshToken: string }; needsOnboarding: boolean; onboardingStep: string }>('/auth/login', {
       method: 'POST',
-      body: { identifier, password, otp },
+      body: { identifier, password, otp, pushToken: pushToken || undefined },
     });
     setTokens(data.tokens.accessToken, data.tokens.refreshToken);
     setUser(data.user);

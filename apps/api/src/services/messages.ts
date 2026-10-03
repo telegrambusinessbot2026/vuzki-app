@@ -75,6 +75,15 @@ export async function sendMessage(input: SendMessageInput): Promise<SendMessageR
     }
   }
 
+  if (type === 'GIFT') {
+    if (!input.clientMessageId) return { ok: false, error: 'MISSING_CLIENT_ID' };
+    const dedupKey = `${input.senderId}:${input.clientMessageId}`;
+    const txn = await prisma.giftTransaction.findUnique({ where: { clientRequestId: dedupKey } });
+    if (!txn || txn.senderId !== input.senderId || txn.giftId !== input.giftId) {
+      return { ok: false, error: 'UNVERIFIED_GIFT' };
+    }
+  }
+
   let record;
   try {
     record = await prisma.message.create({

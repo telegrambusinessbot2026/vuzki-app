@@ -87,11 +87,13 @@ subscriptionRoutes.post('/', authenticate(), wrap(async (req: AuthedRequest, res
   });
 
   // Create billing order via provider
+  const activeProvider = config.paymentProvider;
+  
   const order = await prisma.payment.create({
     data: {
       userId: me,
       orderId: providerOrderId,
-      provider: config.paymentProvider,
+      provider: activeProvider,
       amount: price,
       currency: plan.currency,
       status: 'CREATED',
@@ -101,15 +103,47 @@ subscriptionRoutes.post('/', authenticate(), wrap(async (req: AuthedRequest, res
     },
   });
 
+  let paymentPayload: Record<string, unknown> = {};
+  
+  if (activeProvider.toUpperCase() === 'PHONEPE' && config.phonepeMerchantId) {
+    const { initDynamicQR } = await import('../services/phonepe');
+    const qrResult = await initDynamicQR({
+      transactionId: providerOrderId,
+      amountPaise: Math.round(price * 100),
+    });
+
+    await prisma.payment.update({
+      where: { id: order.id },
+      data: {
+        providerPaymentId: qrResult.transactionId,
+        metadata: {
+          ...(order.metadata as object),
+          qrString: qrResult.qrString,
+        } as any,
+      }
+    });
+
+    paymentPayload = { 
+      merchantId: qrResult.merchantId, 
+      transactionId: qrResult.transactionId,
+      amount: qrResult.amount, 
+      qrString: qrResult.qrString,
+      message: qrResult.message,
+      expiresIn: 1800,
+    };
+  }
+
   res.status(201).json({
     success: true,
     data: {
       orderId: order.orderId,
       amount: price,
       currency: plan.currency,
+      status: order.status,
       plan: { id: plan.id, tier: plan.tier, cycle: plan.cycle, name: plan.name },
       requiresVerification: true,
       existingPlan: existing ? { tier: existing.tier } : null,
+      paymentPayload,
     },
   });
 }));

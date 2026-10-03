@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth-context';
 import { Avatar, VerifiedIcon } from '@/components/ui/Avatar';
 import { Spinner } from '@/components/ui/Button';
 import { SettingsIcon, ChevronRightIcon } from '@/components/ui/Icons';
+import { BoostProfile } from './BoostProfile';
 
 export default function ProfilePage() {
   const { user } = useAuth();
@@ -81,6 +82,8 @@ export default function ProfilePage() {
             Edit Profile
           </button>
         </Link>
+        
+        <BoostProfile />
 
         {/* Stats Row */}
         <div className="flex items-center justify-between mt-6 px-2">

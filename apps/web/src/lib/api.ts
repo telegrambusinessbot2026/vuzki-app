@@ -63,7 +63,7 @@ async function refreshAccessToken(): Promise<boolean> {
         const res = await fetch(`${API_URL}/auth/refresh`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ refreshToken: getRefreshToken() }),
+          body: JSON.stringify({ refreshToken: getRefreshToken(), pushToken: window.localStorage.getItem('fcmToken') || undefined }),
         });
         const json = await res.json();
         if (json.success && json.data?.tokens) {

@@ -9,7 +9,8 @@ import type { FeedUser, PublicUser } from '@/lib/api-users';
 import { useAuth } from '@/lib/auth-context';
 import { Avatar, VerifiedIcon, PremiumBadge, CreatorBadge } from '@/components/ui/Avatar';
 import { Button, Spinner } from '@/components/ui/Button';
-import { ArrowLeftIcon, FlagIcon, CoinIcon, PhoneIcon, VideoIcon, GiftIcon, ChatIcon } from '@/components/ui/Icons';
+import { ArrowLeftIcon, FlagIcon, CoinIcon, PhoneIcon, VideoIcon, GiftIcon, ChatIcon, MoreIcon, LockIcon } from '@/components/ui/Icons';
+import { Select, TextArea } from '@/components/ui/Input';
 
 export default function OtherProfilePage() {
   const params = useParams();
@@ -20,6 +21,15 @@ export default function OtherProfilePage() {
   const [error, setError] = useState('');
   const [following, setFollowing] = useState(false);
   const [followPending, setFollowPending] = useState(false);
+  
+  const [showMenu, setShowMenu] = useState(false);
+  const [blockPending, setBlockPending] = useState(false);
+  const [blocked, setBlocked] = useState(false);
+  const [showReport, setShowReport] = useState(false);
+  const [reportReason, setReportReason] = useState('Harassment');
+  const [reportDetails, setReportDetails] = useState('');
+  const [reportPending, setReportPending] = useState(false);
+  const [reportResult, setReportResult] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -62,6 +72,44 @@ export default function OtherProfilePage() {
     }
   };
 
+  const handleBlock = async () => {
+    if (!user || blockPending) return;
+    if (!confirm(`Are you sure you want to block ${user.displayName}? They will not be able to contact you.`)) return;
+    setBlockPending(true);
+    try {
+      await api(`/users/${user.id}/block`, { method: 'PUT', auth: true });
+      setBlocked(true);
+      setShowMenu(false);
+      alert('User has been blocked.');
+    } catch (e: any) {
+      alert(e.message || 'Failed to block user');
+    } finally {
+      setBlockPending(false);
+    }
+  };
+
+  const handleReport = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || reportPending) return;
+    setReportPending(true);
+    try {
+      await api('/reports', {
+        method: 'POST',
+        auth: true,
+        body: {
+          reportedUserId: user.id,
+          category: reportReason,
+          description: reportDetails,
+        }
+      });
+      setReportResult('Report submitted successfully.');
+    } catch (e: any) {
+      setReportResult(e.message || 'Failed to submit report.');
+    } finally {
+      setReportPending(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -70,7 +118,7 @@ export default function OtherProfilePage() {
     );
   }
 
-  if (!user) {
+  if (!user || blocked) {
     return (
       <div className="px-4 pt-4 pb-4">
         <header className="flex items-center justify-between mb-4">
@@ -79,7 +127,7 @@ export default function OtherProfilePage() {
           <div className="w-9" />
         </header>
         <div className="py-20 text-center">
-          <p className="font-semibold">Profile unavailable</p>
+          <p className="font-semibold">{blocked ? 'User blocked' : 'Profile unavailable'}</p>
           <p className="text-sm text-white/50 mt-1">{error}</p>
         </div>
       </div>
@@ -91,6 +139,42 @@ export default function OtherProfilePage() {
 
   return (
     <div className="relative min-h-dvh bg-[#0a0a0c] pb-[100px]">
+      
+      {/* Report Modal */}
+      {showReport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-4">
+          <div className="bg-[#1a1a1f] w-full max-w-sm rounded-3xl p-6 border border-white/10">
+            <h3 className="font-bold text-lg mb-4">Report {user.displayName}</h3>
+            {reportResult ? (
+              <div>
+                <p className="text-white/70 mb-6">{reportResult}</p>
+                <Button full onClick={() => { setShowReport(false); setReportResult(''); setShowMenu(false); }}>Close</Button>
+              </div>
+            ) : (
+              <form onSubmit={handleReport} className="space-y-4">
+                <Select
+                  label="Reason"
+                  options={[{ value: 'Harassment', label: 'Harassment' }, { value: 'Spam', label: 'Spam' }, { value: 'Inappropriate', label: 'Inappropriate content' }]}
+                  value={reportReason}
+                  onChange={(e) => setReportReason(e.target.value)}
+                />
+                <TextArea
+                  label="Details"
+                  rows={3}
+                  value={reportDetails}
+                  onChange={(e) => setReportDetails(e.target.value)}
+                  placeholder="Additional context..."
+                />
+                <div className="flex gap-2">
+                  <Button variant="secondary" className="flex-1" onClick={() => setShowReport(false)} type="button">Cancel</Button>
+                  <Button variant="danger" className="flex-1" loading={reportPending} type="submit">Submit</Button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Immersive Header Image */}
       <div className="relative h-[400px] w-full">
         {src ? (
@@ -105,9 +189,27 @@ export default function OtherProfilePage() {
         
         <div className="absolute top-0 inset-x-0 pt-safe px-4 py-3 flex items-center justify-between z-10">
           <Link href="/app/home" className="h-10 w-10 flex items-center justify-center rounded-full bg-black/30 backdrop-blur-md border border-white/10 text-white hover:bg-black/50 active:scale-95 transition-all"><ArrowLeftIcon size={18} /></Link>
-          <Link href="/app/safety" className="h-10 w-10 flex items-center justify-center rounded-full bg-black/30 backdrop-blur-md border border-white/10 text-white/70 hover:text-red-400 active:scale-95 transition-all">
-            <FlagIcon size={18} />
-          </Link>
+          
+          {!isOwn && (
+            <div className="relative">
+              <button 
+                onClick={() => setShowMenu(!showMenu)} 
+                className="h-10 w-10 flex items-center justify-center rounded-full bg-black/30 backdrop-blur-md border border-white/10 text-white/70 hover:text-white active:scale-95 transition-all"
+              >
+                <MoreIcon size={18} />
+              </button>
+              {showMenu && (
+                <div className="absolute right-0 mt-2 w-48 rounded-2xl bg-[#1a1a1f] border border-white/10 shadow-xl overflow-hidden py-1 z-20">
+                  <button onClick={handleBlock} disabled={blockPending} className="w-full text-left px-4 py-3 text-sm text-red-400 hover:bg-white/5 font-medium flex items-center gap-2">
+                    <LockIcon size={16} /> Block User
+                  </button>
+                  <button onClick={() => setShowReport(true)} className="w-full text-left px-4 py-3 text-sm text-white/80 hover:bg-white/5 font-medium flex items-center gap-2">
+                    <FlagIcon size={16} /> Report User
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="absolute bottom-6 left-5 right-5 flex flex-col justify-end">
@@ -123,7 +225,7 @@ export default function OtherProfilePage() {
                <h1 className="text-3xl font-extrabold tracking-tight text-white drop-shadow-md">{user.displayName}{user.age ? `, ${user.age}` : ''}</h1>
                <p className="text-sm text-white/80 font-medium drop-shadow-sm flex items-center gap-1.5 mt-0.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-brand-400"></span>
-                  {user.city} · Speaks {user.languages[0] || ''}
+                  {user.city} • Speaks {user.languages[0] || ''}
                </p>
              </div>
           </div>

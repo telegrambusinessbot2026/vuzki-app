@@ -79,6 +79,29 @@ export async function applyRestriction(input: RestrictionInput): Promise<{ restr
       },
     });
 
+    if (
+      input.type === RestrictionType.BAN ||
+      input.type === RestrictionType.SUSPENSION ||
+      input.type === RestrictionType.TEMP_SUSPENSION ||
+      input.type === RestrictionType.CALL_RESTRICTION ||
+      (input.type === RestrictionType.COMM_RESTRICTION && (input.scope === RestrictionScope.ALL || input.scope === RestrictionScope.CALL))
+    ) {
+      const activeCalls = await tx.call.findMany({
+        where: {
+          status: { in: ['RINGING', 'ONGOING'] },
+          OR: [{ callerId: input.userId }, { receiverId: input.userId }],
+        },
+      });
+      if (activeCalls.length > 0) {
+        for (const call of activeCalls) {
+          await tx.call.update({
+            where: { id: call.id },
+            data: { status: call.status === 'RINGING' ? 'CANCELLED' : 'FAILED', endedAt: new Date() },
+          });
+        }
+      }
+    }
+
     await recordSafetySignal({ userId: input.userId, signalType: 'MOD_ACTION', reason: `Restriction ${input.type}` });
     return { restriction, action };
   });

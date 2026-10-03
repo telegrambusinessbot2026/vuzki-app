@@ -153,6 +153,9 @@ export const config = {
   phonepeClientSecret: process.env.PHONEPE_CLIENT_SECRET || '',
   phonepeSaltKey: process.env.PHONEPE_SALT_KEY || '',
   phonepeSaltIndex: process.env.PHONEPE_SALT_INDEX || '',
+  phonepeStoreId: process.env.PHONEPE_STORE_ID || '',
+  phonepeTerminalId: process.env.PHONEPE_TERMINAL_ID || '',
+  phonepeEnv: (process.env.PHONEPE_ENV || 'PROD').toUpperCase(),
 // RTC / Calls
   rtcProvider: process.env.RTC_PROVIDER || 'webrtc', // webrtc | twilio | agora | livekit
   twilioApiKey: process.env.TWILIO_API_KEY || '',

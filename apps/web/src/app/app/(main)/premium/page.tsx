@@ -26,11 +26,15 @@ function CheckIcon({ size = 18 }: { size?: number }) {
   );
 }
 
+import { PaymentModal, PaymentPayload } from '@/components/domain/PaymentModal';
+import { SuperLikesSection } from './SuperLikesSection';
+
 export default function PremiumPage() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [tier, setTier] = useState('FREE');
   const [error, setError] = useState('');
   const [working, setWorking] = useState(false);
+  const [activePayment, setActivePayment] = useState<{ orderId: string, provider: string, paymentPayload: PaymentPayload, amount: number, currency: string } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -56,15 +60,34 @@ export default function PremiumPage() {
     };
   }, []);
 
+  const refreshTier = async () => {
+    try {
+      const meData = await api<{ effectiveTier: string }>('/subscriptions/me', { auth: true });
+      setTier(meData.effectiveTier);
+    } catch (e) {}
+  };
+
   const subscribe = async (plan: Plan) => {
     setWorking(true);
     setError('');
     try {
-      const res = await post<{ orderId: string; requiresVerification: boolean }>('/subscriptions', { planId: plan.id });
+      const res = await post<{ orderId: string; requiresVerification: boolean; paymentPayload?: PaymentPayload }>('/subscriptions', { planId: plan.id });
+      
+      if (res.paymentPayload?.qrString) {
+        // Handle PhonePe or dynamic QR
+        setActivePayment({
+          orderId: res.orderId,
+          provider: 'phonepe', // inferred
+          paymentPayload: res.paymentPayload,
+          amount: plan.price,
+          currency: plan.currency,
+        });
+        return;
+      }
+
       if (res.requiresVerification) {
-        await post('/subscriptions/verify', { orderId: res.orderId });
-        const meData = await api<{ effectiveTier: string }>('/subscriptions/me', { auth: true });
-        setTier(meData.effectiveTier);
+        await post('/subscriptions/verify', { orderId: res.orderId }).catch(() => {});
+        await refreshTier();
       }
     } catch (e) {
       setError((e as Error)?.message || 'Subscription failed');
@@ -165,6 +188,8 @@ export default function PremiumPage() {
           </tbody>
         </table>
       </Card>
+      
+      <SuperLikesSection />
 
       <Divider className="my-4" />
 
@@ -172,6 +197,21 @@ export default function PremiumPage() {
         <div className="h-10 w-10 rounded-xl bg-green-500/15 text-green-400 flex items-center justify-center shrink-0"><ShieldIcon size={18} /></div>
         <p className="text-sm text-white/60">Subscriptions auto-renew monthly. Cancel anytime in Settings. All payments are secure and encrypted.</p>
       </Card>
+
+      {activePayment && (
+        <PaymentModal
+          orderId={activePayment.orderId}
+          provider={activePayment.provider}
+          paymentPayload={activePayment.paymentPayload}
+          amount={activePayment.amount}
+          currency={activePayment.currency}
+          onSuccess={() => {
+            setActivePayment(null);
+            refreshTier();
+          }}
+          onCancel={() => setActivePayment(null)}
+        />
+      )}
     </div>
   );
 }

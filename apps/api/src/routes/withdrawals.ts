@@ -86,7 +86,7 @@ withdrawalRoutes.post('/', authenticate(), wrap(async (req: AuthedRequest, res) 
     // Consume the requested amount across earning rows. Partial consumption is
     // tracked on the row (withdrawnAmount) so the leftover is NEVER lost. Fully
     // consumed rows are marked WITHDRAWN so they leave the available ledger.
-    const consumedEarningIds: string[] = [];
+    const consumed: { id: string; taken: number }[] = [];
     let remaining = amount;
     for (const e of withdrawableRows) {
       if (remaining <= 0) break;
@@ -95,7 +95,7 @@ withdrawalRoutes.post('/', authenticate(), wrap(async (req: AuthedRequest, res) 
       const take = Math.min(rowAvailable, remaining);
       const newWithdrawn = (e.withdrawnAmount || 0) + take;
       remaining -= take;
-      consumedEarningIds.push(e.id);
+      consumed.push({ id: e.id, taken: take });
       const fullyConsumed = newWithdrawn >= e.amount - 0.0001;
       await tx.creatorEarning.update({
         where: { id: e.id },
@@ -112,7 +112,7 @@ withdrawalRoutes.post('/', authenticate(), wrap(async (req: AuthedRequest, res) 
         amount,
         currency: 'INR',
         method,
-        details: { ...(details as any), consumedEarningIds } as any,
+        details: { ...(details as any), consumed } as any,
         status: WithdrawalStatus.PENDING,
       },
     });
