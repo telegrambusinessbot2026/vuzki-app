@@ -15,14 +15,20 @@ export default function OAuthCallbackPage({ params }: { params: { provider: stri
     if (typeof window === 'undefined') return;
 
     const hash = window.location.hash.substring(1);
-    const params = new URLSearchParams(hash);
+    const hashParams = new URLSearchParams(hash);
+    const searchParams = new URLSearchParams(window.location.search);
     
+    // Immediately clear the hash from the browser URL to prevent token leakage
+    if (window.location.hash) {
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
+
     // Google/Apple typically use id_token, Facebook uses access_token
-    const token = params.get('id_token') || params.get('access_token') || params.get('token');
+    const token = hashParams.get('id_token') || hashParams.get('access_token') || hashParams.get('token');
+    const state = hashParams.get('state') || searchParams.get('state');
     
     // Check for query string errors (e.g. user cancelled)
-    const queryParams = new URLSearchParams(window.location.search);
-    const queryError = queryParams.get('error') || params.get('error');
+    const queryError = searchParams.get('error') || hashParams.get('error');
 
     if (queryError) {
       setError(`Authentication failed: ${queryError}`);
@@ -37,6 +43,39 @@ export default function OAuthCallbackPage({ params }: { params: { provider: stri
     if (!['google', 'apple', 'facebook'].includes(provider)) {
       setError('Unknown authentication provider.');
       return;
+    }
+
+    // Validate state
+    const storedState = window.sessionStorage.getItem('oauth_state');
+    window.sessionStorage.removeItem('oauth_state'); // consume it
+    if (!state || !storedState || state !== storedState) {
+      setError('Security validation failed: Invalid or missing state parameter.');
+      return;
+    }
+
+    // Validate nonce for Google/Apple
+    if (provider === 'google' || provider === 'apple') {
+      const storedNonce = window.sessionStorage.getItem('oauth_nonce');
+      window.sessionStorage.removeItem('oauth_nonce'); // consume it
+      try {
+        const payloadBase64 = token.split('.')[1];
+        if (!payloadBase64) throw new Error('Invalid token format');
+        
+        // Base64Url decode logic
+        const base64 = payloadBase64.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+        
+        const payload = JSON.parse(jsonPayload);
+        if (!storedNonce || payload.nonce !== storedNonce) {
+          setError('Security validation failed: Invalid or missing nonce.');
+          return;
+        }
+      } catch (err) {
+        setError('Security validation failed: Malformed token.');
+        return;
+      }
     }
 
     // Verify token with backend

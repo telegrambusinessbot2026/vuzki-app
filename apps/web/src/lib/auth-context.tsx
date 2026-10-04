@@ -126,24 +126,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // intentionally disabled so neither can be invoked or fake a successful
   // authentication. Re-enable these (and the hidden UI buttons in the auth
   // pages) only after a real end-to-end OAuth flow exists.
+
+  const generateRandomString = (length = 32) => {
+    const array = new Uint8Array(length);
+    window.crypto.getRandomValues(array);
+    return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+  };
+
   const loginWithGoogle = useCallback(async () => {
     const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
     if (!clientId) throw new Error('Google OAuth is BLOCKED: Missing NEXT_PUBLIC_GOOGLE_CLIENT_ID environment variable.');
-    const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(window.location.origin + '/auth/callback/google')}&response_type=id_token&scope=email profile&nonce=vuzki_nonce`;
+    const state = generateRandomString();
+    const nonce = generateRandomString();
+    window.sessionStorage.setItem('oauth_state', state);
+    window.sessionStorage.setItem('oauth_nonce', nonce);
+    const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(window.location.origin + '/auth/callback/google')}&response_type=id_token&scope=email profile&state=${state}&nonce=${nonce}`;
     window.location.href = url;
   }, []);
 
   const loginWithApple = useCallback(async () => {
     const clientId = process.env.NEXT_PUBLIC_APPLE_CLIENT_ID;
     if (!clientId) throw new Error('Apple OAuth is BLOCKED: Missing NEXT_PUBLIC_APPLE_CLIENT_ID environment variable.');
-    const url = `https://appleid.apple.com/auth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(window.location.origin + '/auth/callback/apple')}&response_type=id_token&response_mode=fragment`;
+    const state = generateRandomString();
+    const nonce = generateRandomString();
+    window.sessionStorage.setItem('oauth_state', state);
+    window.sessionStorage.setItem('oauth_nonce', nonce);
+    const url = `https://appleid.apple.com/auth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(window.location.origin + '/auth/callback/apple')}&response_type=id_token&response_mode=fragment&state=${state}&nonce=${nonce}`;
     window.location.href = url;
   }, []);
 
   const loginWithFacebook = useCallback(async () => {
     const clientId = process.env.NEXT_PUBLIC_FACEBOOK_CLIENT_ID;
     if (!clientId) throw new Error('Facebook OAuth is BLOCKED: Missing NEXT_PUBLIC_FACEBOOK_CLIENT_ID environment variable.');
-    const url = `https://www.facebook.com/v17.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(window.location.origin + '/auth/callback/facebook')}&response_type=token&scope=email,public_profile`;
+    const state = generateRandomString();
+    window.sessionStorage.setItem('oauth_state', state);
+    const url = `https://www.facebook.com/v17.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(window.location.origin + '/auth/callback/facebook')}&response_type=token&scope=email,public_profile&state=${state}`;
     window.location.href = url;
   }, []);
 
