@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth-context';
 import { ApiError } from '@/lib/api';
 import { RedirectIfAuthed } from '@/components/shell/RedirectIfAuthed';
 import { Input, PasswordInput } from '@/components/ui/Input';
+import { BrandLogo } from '@/components/ui/BrandLogo';
 
 const MailIcon = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>;
 const LockIcon = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>;
@@ -83,7 +84,7 @@ export default function LoginPage() {
         </header>
 
         <div className="flex-1 flex flex-col px-6 pt-6 pb-6 relative z-10 w-full max-w-sm mx-auto">
-          <Logo />
+          <BrandLogo />
           
           <div className="text-center mb-8">
             <h1 className="text-[28px] font-bold text-white mb-2">Welcome Back</h1>

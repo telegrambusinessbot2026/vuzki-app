@@ -3,6 +3,8 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { BrandLogo } from '@/components/ui/BrandLogo';
+import { BRAND_CONFIG } from '@/lib/brand.config';
 
 export default function WelcomeCarousel() {
   const router = useRouter();
@@ -21,7 +23,7 @@ export default function WelcomeCarousel() {
       {/* Background Image */}
       <div className="absolute inset-0 z-0">
         <img 
-          src="https://images.unsplash.com/photo-1517365830460-955ce3ccd263?q=80&w=600&auto=format&fit=crop" 
+          src={BRAND_CONFIG.assets.onboarding[step] || BRAND_CONFIG.assets.onboarding[0]}
           alt="Background" 
           className="w-full h-full object-cover opacity-60" 
         />
@@ -31,15 +33,7 @@ export default function WelcomeCarousel() {
       {/* Header */}
       <header className="relative z-10 flex items-center justify-between px-6 pt-safe-top mt-4">
         <div className="flex items-center gap-2">
-          <svg width="24" height="24" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M20 38C20 38 4 28 4 15C4 9.47715 8.47715 5 14 5C17.0678 5 19.8133 6.37923 21.6441 8.5684C23.0805 6.43851 25.5905 5 28.5 5C34.0228 5 38.5 9.47715 38.5 15C38.5 28 20 38 20 38Z" fill="url(#paint0_linear_logo_wel)"/>
-            <defs>
-              <linearGradient id="paint0_linear_logo_wel" x1="4" y1="5" x2="38.5" y2="38" gradientUnits="userSpaceOnUse">
-                <stop stopColor="#FF4DBD"/>
-                <stop offset="1" stopColor="#A855F7"/>
-              </linearGradient>
-            </defs>
-          </svg>
+          <BrandLogo />
           <div>
             <h1 className="text-lg font-black tracking-tight text-white leading-none">VUZKI</h1>
             <p className="text-[7px] text-white/70">Real People. Real Connections.</p>

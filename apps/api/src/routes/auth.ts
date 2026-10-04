@@ -15,6 +15,7 @@ import {
   PremiumTier,
   REFERRAL_REWARD_COINS,
   WalletTransactionType,
+  MIN_AGE,
 } from '@vuzki/shared';
 import { verifyGoogleToken, verifyAppleToken, verifyFacebookToken } from '../services/oauth';
 
@@ -111,19 +112,20 @@ authRoutes.post('/register', rateLimiter(15 * 60 * 1000, 5), wrap(async (req, re
   let dateOfBirth: Date | undefined = undefined;
   if (body.dob) {
     dateOfBirth = new Date(body.dob);
+    if (isNaN(dateOfBirth.getTime())) {
+      throw new ApiErrorResponse(400, 'INVALID_DOB', 'Invalid date of birth format');
+    }
     if (!isAdult(dateOfBirth)) {
-      throw new ApiErrorResponse(403, 'UNDERAGE', 'You must be at least 18 years old to use VUZKI');
+      throw new ApiErrorResponse(403, 'UNDERAGE', `You must be at least ${MIN_AGE} years old to use VUZKI`);
     }
   } else if (typeof body.age === 'number') {
     dateOfBirth = new Date(new Date().getFullYear() - body.age, 0, 1);
     if (!isAdult(dateOfBirth)) {
-      throw new ApiErrorResponse(403, 'UNDERAGE', 'You must be at least 18 years old to use VUZKI');
+      throw new ApiErrorResponse(403, 'UNDERAGE', `You must be at least ${MIN_AGE} years old to use VUZKI`);
     }
   } else {
-    // If local provider and no DOB/age is provided, block it.
-    if (body.provider === 'local') {
-      throw new ApiErrorResponse(400, 'DOB_REQUIRED', 'Date of birth is required');
-    }
+    // Missing DOB/age is completely rejected for all new accounts.
+    throw new ApiErrorResponse(400, 'DOB_REQUIRED', 'Date of birth is required');
   }
 
   // reward referrer if referral code present

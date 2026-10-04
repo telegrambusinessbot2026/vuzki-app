@@ -5,30 +5,10 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { RedirectIfAuthed } from '@/components/shell/RedirectIfAuthed';
 import { Input } from '@/components/ui/Input';
+import { BrandLogo } from '@/components/ui/BrandLogo';
 
 const KeyIcon = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path></svg>;
 
-const Logo = () => (
-  <div className="flex flex-col items-center mb-8">
-    <svg width="60" height="60" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg" className="mb-4">
-      <path d="M30 50C30 50 10 35 10 20C10 12 16 8 22 8C26 8 28 10 30 14C32 10 34 8 38 8C44 8 50 12 50 20C50 35 30 50 30 50Z" stroke="url(#paint0_linear)" strokeWidth="4" fill="none"/>
-      <path d="M40 25C40 25 30 35 25 35C20 35 18 30 20 25C22 20 28 18 32 18C38 18 40 22 40 25Z" stroke="url(#paint1_linear)" strokeWidth="2" fill="none"/>
-      <defs>
-        <linearGradient id="paint0_linear" x1="10" y1="8" x2="50" y2="50" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#FF2D8F"/>
-          <stop offset="1" stopColor="#855CF6"/>
-        </linearGradient>
-        <linearGradient id="paint1_linear" x1="20" y1="18" x2="40" y2="35" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#FF006E"/>
-          <stop offset="1" stopColor="#6C3BFF"/>
-        </linearGradient>
-      </defs>
-    </svg>
-    <h2 className="text-[28px] font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-[#FF2D8F] to-[#855CF6] leading-none mb-1">
-      VUZKI
-    </h2>
-  </div>
-);
 
 export default function VerifyOtpPage() {
   const router = useRouter();
@@ -63,7 +43,7 @@ export default function VerifyOtpPage() {
         </header>
 
         <div className="flex-1 flex flex-col px-6 pt-6 pb-6 relative z-10 w-full max-w-sm mx-auto">
-          <Logo />
+          <BrandLogo />
           
           <div className="text-center mb-8">
             <h1 className="text-[28px] font-bold text-white mb-2">Verification</h1>
