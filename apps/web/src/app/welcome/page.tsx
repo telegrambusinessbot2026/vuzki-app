@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { BrandLogo } from '@/components/ui/BrandLogo';
-import { BRAND_CONFIG } from '@/lib/brand.config';
+import { BRAND_CONFIG } from '@/config/assets/assets.config';
 
 export default function WelcomeCarousel() {
   const router = useRouter();
