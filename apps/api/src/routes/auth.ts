@@ -30,7 +30,7 @@ const registerSchema = z.object({
   providerId: z.string().optional(), // Legacy support
   name: z.string().optional(),
   username: z.string().optional(),
-  gender: z.string().optional(),
+  gender: z.enum(['MALE', 'FEMALE', 'PREFER_NOT_TO_SAY', 'NON_BINARY', 'OTHER']),
   dob: z.string().optional(), // ISO string YYYY-MM-DD
   age: z.number().int().min(18).max(120).optional(), // Legacy support
   countryCode: z.string().max(3).optional(),
@@ -62,6 +62,7 @@ authRoutes.post('/register', rateLimiter(15 * 60 * 1000, 5), wrap(async (req, re
       throw new ApiErrorResponse(400, 'WEAK_PASSWORD', 'Password must be at least 8 chars with letters and numbers');
     }
     if (body.email && !isValidEmail(body.email)) throw new ApiErrorResponse(400, 'INVALID_EMAIL', 'Invalid email');
+    if (body.email && !body.email.endsWith('@gmail.com')) throw new ApiErrorResponse(400, 'INVALID_EMAIL_DOMAIN', 'Only Gmail addresses are allowed');
     if (body.phone && !isValidPhone(body.phone)) throw new ApiErrorResponse(400, 'INVALID_PHONE', 'Invalid phone');
   } else if (body.provider === 'google' || body.provider === 'apple' || body.provider === 'facebook') {
     if (!body.token) throw new ApiErrorResponse(400, 'TOKEN_REQUIRED', 'OAuth token is required for social login');

@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => {
   const walletTxCreate = vi.fn();
   const walletTxFindUnique = vi.fn();
   const creatorEarningCreate = vi.fn();
+  const auditLogCreate = vi.fn().mockResolvedValue({});
   const tx = {
     call: { updateMany: callUpdateMany, count: callCount },
     callParticipant: { upsert: callParticipantUpsert },
@@ -23,6 +24,7 @@ const mocks = vi.hoisted(() => {
     wallet: { findUnique: walletFindUnique, updateMany: walletUpdateMany },
     walletTransaction: { create: walletTxCreate, findUnique: walletTxFindUnique },
     creatorEarning: { create: creatorEarningCreate },
+    auditLog: { create: auditLogCreate },
   };
   return {
     callFindUnique,
@@ -39,6 +41,7 @@ const mocks = vi.hoisted(() => {
     walletTxCreate,
     walletTxFindUnique,
     creatorEarningCreate,
+    auditLogCreate,
     tx,
   };
 });
@@ -46,6 +49,7 @@ const mocks = vi.hoisted(() => {
 vi.mock('@vuzki/database', () => ({
   prisma: {
     $transaction: vi.fn(async (fn: (t: any) => Promise<unknown>) => fn(mocks.tx)),
+    auditLog: { create: mocks.auditLogCreate },
     call: {
       findUnique: mocks.callFindUnique,
       updateMany: mocks.callUpdateMany,

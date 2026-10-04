@@ -90,6 +90,17 @@ export async function initiateCall(params: { callerId: string; receiverId: strin
     });
   }
 
+  await prisma.auditLog.create({
+    data: {
+      actorId: params.callerId,
+      actorType: 'USER',
+      action: 'CALL_STARTED',
+      entityType: 'Call',
+      entityId: call.id,
+      metadata: { receiverId: params.receiverId, type: params.type },
+    },
+  }).catch(() => {});
+
   return { call, rate };
 }
 
@@ -291,6 +302,24 @@ export async function endCall(callId: string, opts?: { quality?: string; failRea
       where: { id: call.receiverId },
       data: { creatorStatus: 'AVAILABLE' },
     });
+
+    await tx.auditLog.create({
+      data: {
+        actorId: opts?.endBy ?? call.callerId,
+        actorType: 'USER',
+        action: 'CALL_ENDED',
+        entityType: 'Call',
+        entityId: callId,
+        metadata: {
+          callerId: call.callerId,
+          receiverId: call.receiverId,
+          type: call.type,
+          duration: billing.durationSeconds,
+          status,
+          failReason: opts?.failReason,
+        },
+      },
+    }).catch(() => {});
 
     return { call: { id: callId, status, durationSeconds: billing.durationSeconds, costCoins: billing.costCoins, creatorEarnings: billed ? billing.creatorCoins : 0, billed } };
   });

@@ -76,6 +76,8 @@ describe('Authentication Security', () => {
       const res = await request(buildApp()).post('/api/v1/auth/register').send({
         provider: 'google',
         providerId: 'forged_id_123',
+        gender: 'MALE',
+        dob: '1990-01-01',
       });
       expect(res.status).toBe(400);
       expect(res.body.error.code).toBe('TOKEN_REQUIRED');
@@ -86,6 +88,8 @@ describe('Authentication Security', () => {
       const res = await request(buildApp()).post('/api/v1/auth/register').send({
         provider: 'google',
         token: 'invalid_jwt',
+        gender: 'MALE',
+        dob: '1990-01-01',
       });
       expect(res.status).toBe(401);
       expect(res.body.error.code).toBe('INVALID_OAUTH_TOKEN');
@@ -105,6 +109,7 @@ describe('Authentication Security', () => {
         provider: 'google',
         token: 'valid_google_token',
         dob: '1990-01-01',
+        gender: 'MALE',
       });
       expect(res.status).toBe(201);
       expect(res.body.success).toBe(true);
@@ -116,6 +121,8 @@ describe('Authentication Security', () => {
       const res = await request(buildApp()).post('/api/v1/auth/register').send({
         provider: 'apple',
         providerId: 'forged_apple_id',
+        gender: 'MALE',
+        dob: '1990-01-01',
       });
       expect(res.status).toBe(400);
       expect(res.body.error.code).toBe('TOKEN_REQUIRED');
@@ -126,6 +133,8 @@ describe('Authentication Security', () => {
       const res = await request(buildApp()).post('/api/v1/auth/register').send({
         provider: 'apple',
         token: 'invalid_apple_jwt',
+        gender: 'MALE',
+        dob: '1990-01-01',
       });
       expect(res.status).toBe(401);
       expect(res.body.error.code).toBe('INVALID_OAUTH_TOKEN');
@@ -136,9 +145,10 @@ describe('Authentication Security', () => {
     it('rejects underage registration (DOB)', async () => {
       const res = await request(buildApp()).post('/api/v1/auth/register').send({
         provider: 'local',
-        email: 'underage@test.com',
+        email: 'underage@gmail.com',
         password: 'Password123!',
         dob: new Date().toISOString(), // Today (0 years old)
+        gender: 'MALE',
       });
       expect(res.status).toBe(403);
       expect(res.body.error.code).toBe('UNDERAGE');
@@ -150,10 +160,12 @@ describe('Authentication Security', () => {
       
       const res = await request(buildApp()).post('/api/v1/auth/register').send({
         provider: 'local',
-        email: 'adult@test.com',
+        email: 'adult@gmail.com',
         password: 'Password123!',
         dob: '2000-01-01',
+        gender: 'MALE',
       });
+      if (res.status !== 201) console.log('RESPONSE:', res.body);
       expect(res.status).toBe(201);
       expect(res.body.success).toBe(true);
     });
@@ -161,9 +173,10 @@ describe('Authentication Security', () => {
     it('rejects future DOB', async () => {
       const res = await request(buildApp()).post('/api/v1/auth/register').send({
         provider: 'local',
-        email: 'future@test.com',
+        email: 'future@gmail.com',
         password: 'Password123!',
         dob: '2050-01-01',
+        gender: 'MALE',
       });
       expect(res.status).toBe(403);
       expect(res.body.error.code).toBe('UNDERAGE');

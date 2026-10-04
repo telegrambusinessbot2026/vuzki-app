@@ -808,3 +808,10 @@ adminRoutes.patch('/creators/:id/kyc', requireAdmin, requirePermission('creators
   });
   res.json({ success: true, data: { kyciStatus: updated.kyciStatus } });
 }));
+
+// GET /admin/activity
+adminRoutes.get('/activity', requireAdmin, requirePermission('audit.read'), wrap(async (req: AdminRequest, res) => {
+  const logs = await prisma.auditLog.findMany({ where: { actorType: 'USER' }, orderBy: { createdAt: 'desc' }, take: 50 });
+  res.json({ success: true, data: { data: logs, meta: { total: logs.length } } });
+}));
+

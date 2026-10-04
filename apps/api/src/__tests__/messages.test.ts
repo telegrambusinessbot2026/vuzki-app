@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => {
   const moderateText = vi.fn();
   const getSocketIds = vi.fn();
   const notify = vi.fn();
+  const auditLogCreate = vi.fn().mockResolvedValue({});
   return {
     convFindUnique,
     msgCreate,
@@ -20,11 +21,13 @@ const mocks = vi.hoisted(() => {
     moderateText,
     getSocketIds,
     notify,
+    auditLogCreate,
   };
 });
 
 vi.mock('@vuzki/database', () => ({
   prisma: {
+    auditLog: { create: mocks.auditLogCreate },
     conversation: {
       findUnique: mocks.convFindUnique,
       update: mocks.convUpdate,

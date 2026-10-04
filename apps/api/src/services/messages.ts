@@ -113,6 +113,21 @@ export async function sendMessage(input: SendMessageInput): Promise<SendMessageR
 
   await prisma.conversation.update({ where: { id: input.conversationId }, data: { updatedAt: new Date() } });
 
+  await prisma.auditLog.create({
+    data: {
+      actorId: input.senderId,
+      actorType: 'USER',
+      action: 'MESSAGE_SENT',
+      entityType: 'Message',
+      entityId: record.id,
+      metadata: {
+        receiverId: otherId,
+        conversationId: input.conversationId,
+        type: record.type,
+      },
+    },
+  }).catch(() => {});
+
   const peerOnline = input.peerOnline !== undefined ? input.peerOnline : getSocketIds(otherId).length > 0;
   let deliveredAt: string | null = null;
   if (peerOnline) {
