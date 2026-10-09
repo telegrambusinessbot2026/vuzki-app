@@ -12,17 +12,19 @@ export default function SafetyPage() {
   const [reporting, setReporting] = useState(false);
   const [reported, setReported] = useState(false);
   const [reportUser, setReportUser] = useState('');
-  const [reportReason, setReportReason] = useState('Harassment');
+  const [reportReason, setReportReason] = useState('HARASSMENT');
   const [reportDetails, setReportDetails] = useState('');
   const [reportError, setReportError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const reasonOptions = [
-    { value: 'Harassment', label: 'Harassment or abuse' },
-    { value: 'Inappropriate', label: 'Inappropriate content' },
-    { value: 'Impersonation', label: 'Fake or impersonation' },
-    { value: 'Spam', label: 'Spam or scam' },
-    { value: 'Other', label: 'Something else' },
+    { value: 'HARASSMENT', label: 'Harassment or abuse' },
+    { value: 'INAPPROPRIATE', label: 'Inappropriate content' },
+    { value: 'FAKE_PROFILE', label: 'Fake profile or impersonation' },
+    { value: 'SPAM', label: 'Spam or automated bot' },
+    { value: 'SCAM', label: 'Scam or fraud attempt' },
+    { value: 'THREATS', label: 'Threats of violence' },
+    { value: 'OTHER', label: 'Other violation' },
   ];
 
   const submitReport = async (e: React.FormEvent) => {
@@ -122,9 +124,9 @@ export default function SafetyPage() {
       <h2 className="text-[11px] font-bold text-white/40 uppercase tracking-widest mb-3 pl-2 mt-8">Resources</h2>
       <Card className="divide-y divide-white/5 mb-8 glass-panel border border-white/5 overflow-hidden">
         <InfoRow icon={<LockIcon size={18} />} title="Block & Report" subtitle="Block unwanted users and report abuse" href="/app/settings/blocked" />
-        <InfoRow icon={<DocumentIcon size={18} />} title="Community Guidelines" subtitle="Read our rules for the community" />
-        <InfoRow icon={<ShieldIcon size={18} />} title="Help & Emergency" subtitle="Support resources and hotlines" />
-        <InfoRow icon={<DocumentIcon size={18} />} title="Trust & Safety" subtitle="Learn how we protect you" />
+        <InfoRow icon={<DocumentIcon size={18} />} title="Community Guidelines" subtitle="Read our rules for the community" href="/safety" />
+        <InfoRow icon={<ShieldIcon size={18} />} title="Help & Support" subtitle="Submit support tickets and appeals" href="/app/support" />
+        <InfoRow icon={<DocumentIcon size={18} />} title="Privacy Policy" subtitle="Learn how your data is protected" href="/privacy" />
       </Card>
     </div>
   );

@@ -9,40 +9,50 @@ import { RedirectIfAuthed } from '@/components/shell/RedirectIfAuthed';
 import { Input, PasswordInput } from '@/components/ui/Input';
 import { BrandLogo } from '@/components/ui/BrandLogo';
 
-const MailIcon = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>;
-const LockIcon = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>;
-const KeyIcon = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path></svg>;
+const MailIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+    <polyline points="22,6 12,13 2,6" />
+  </svg>
+);
 
-const GoogleIcon = () => <svg width="22" height="22" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M21.35 11.1h-9.17v2.73h5.51c-.18 1.48-1.12 2.62-2.4 3.48v2.85h3.9a9.66 9.66 0 0 0 3.01-6.91c0-.75-.12-1.48-.35-2.15z" fill="#4285F4"/><path d="M12.18 20.47c2.6 0 4.79-.86 6.38-2.33l-3.9-2.85c-.86.58-1.95.92-3.1.92-2.38 0-4.4-1.61-5.12-3.77H2.43v2.94c1.61 3.2 4.93 5.4 8.75 5.4z" fill="#34A853"/><path d="M7.06 12.44c-.18-.54-.29-1.1-.29-1.68 0-.58.11-1.14.29-1.68V6.14H2.43a9.7 9.7 0 0 0-.6 3.42c0 1.57.37 3.06 1.02 4.38l4.21-1.5z" fill="#FBBC05"/><path d="M12.18 5.4c1.41 0 2.68.48 3.68 1.44l2.76-2.76A9.63 9.63 0 0 0 12.18 1C8.36 1 5.04 3.2 3.43 6.4L7.64 9.34c.72-2.16 2.74-3.77 5.12-3.77z" fill="#EA4335"/></svg>;
-const AppleIcon = () => <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M17.05 16.48c-.02.06-2.6 9-7.25 9-2.22 0-3.08-1.37-5.63-1.37-2.5 0-3.5 1.35-5.58 1.35-4.8 0-7.85-9.67-4.48-15.52 1.6-2.78 4.45-4.52 7.42-4.55 2.37-.02 4.6 1.62 5.85 1.62 1.25 0 3.8-1.92 6.57-1.65 1.15.05 4.38.45 6.45 3.48-5.32 3.1-4.45 10.6.9 12.75-.43 1.1-.98 2.22-1.6 3.28h-1.68v-.02l-1.6.02v-3.23l-3.32-.02-.13-5.23zm-3.15-13.8a6.38 6.38 0 0 0 1.5-4.68 6.55 6.55 0 0 0-4.22 2.18 6.13 6.13 0 0 0-1.55 4.5 5.25 5.25 0 0 0 4.27-2z" transform="scale(0.85) translate(2.5, 1)"/></svg>;
-const FacebookIcon = () => <svg width="22" height="22" viewBox="0 0 24 24" fill="#1877F2" xmlns="http://www.w3.org/2000/svg"><path d="M24 12.07C24 5.41 18.63 0 12 0S0 5.4 0 12.07C0 18.1 4.39 23.1 10.13 24v-8.44H7.08v-3.49h3.04V9.41c0-3.02 1.8-4.7 4.54-4.7 1.31 0 2.68.24 2.68.24v2.97h-1.5c-1.5 0-1.96.93-1.96 1.89v2.26h3.32l-.53 3.5h-2.8V24C19.62 23.1 24 18.1 24 12.07z"/></svg>;
+const LockIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+  </svg>
+);
 
-const Logo = () => (
-  <div className="flex flex-col items-center mb-8">
-    <svg width="60" height="60" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg" className="mb-4">
-      <path d="M30 50C30 50 10 35 10 20C10 12 16 8 22 8C26 8 28 10 30 14C32 10 34 8 38 8C44 8 50 12 50 20C50 35 30 50 30 50Z" stroke="url(#paint0_linear)" strokeWidth="4" fill="none"/>
-      <path d="M40 25C40 25 30 35 25 35C20 35 18 30 20 25C22 20 28 18 32 18C38 18 40 22 40 25Z" stroke="url(#paint1_linear)" strokeWidth="2" fill="none"/>
-      <defs>
-        <linearGradient id="paint0_linear" x1="10" y1="8" x2="50" y2="50" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#FF2D8F"/>
-          <stop offset="1" stopColor="#855CF6"/>
-        </linearGradient>
-        <linearGradient id="paint1_linear" x1="20" y1="18" x2="40" y2="35" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#FF006E"/>
-          <stop offset="1" stopColor="#6C3BFF"/>
-        </linearGradient>
-      </defs>
-    </svg>
-    <h2 className="text-[28px] font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-[#FF2D8F] to-[#855CF6] leading-none mb-1">
-      VUZKI
-    </h2>
-    <p className="text-[11px] text-white/70 font-medium tracking-tight mb-8 uppercase tracking-widest">Real People. Real Connections.</p>
-  </div>
+const KeyIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" />
+  </svg>
+);
+
+const GoogleIcon = () => (
+  <svg width="22" height="22" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <path d="M21.35 11.1h-9.17v2.73h5.51c-.18 1.48-1.12 2.62-2.4 3.48v2.85h3.9a9.66 9.66 0 0 0 3.01-6.91c0-.75-.12-1.48-.35-2.15z" fill="#4285F4" />
+    <path d="M12.18 20.47c2.6 0 4.79-.86 6.38-2.33l-3.9-2.85c-.86.58-1.95.92-3.1.92-2.38 0-4.4-1.61-5.12-3.77H2.43v2.94c1.61 3.2 4.93 5.4 8.75 5.4z" fill="#34A853" />
+    <path d="M7.06 12.44c-.18-.54-.29-1.1-.29-1.68 0-.58.11-1.14.29-1.68V6.14H2.43a9.7 9.7 0 0 0-.6 3.42c0 1.57.37 3.06 1.02 4.38l4.21-1.5z" fill="#FBBC05" />
+    <path d="M12.18 5.4c1.41 0 2.68.48 3.68 1.44l2.76-2.76A9.63 9.63 0 0 0 12.18 1C8.36 1 5.04 3.2 3.43 6.4L7.64 9.34c.72-2.16 2.74-3.77 5.12-3.77z" fill="#EA4335" />
+  </svg>
+);
+
+const AppleIcon = () => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+    <path d="M17.05 16.48c-.02.06-2.6 9-7.25 9-2.22 0-3.08-1.37-5.63-1.37-2.5 0-3.5 1.35-5.58 1.35-4.8 0-7.85-9.67-4.48-15.52 1.6-2.78 4.45-4.52 7.42-4.55 2.37-.02 4.6 1.62 5.85 1.62 1.25 0 3.8-1.92 6.57-1.65 1.15.05 4.38.45 6.45 3.48-5.32 3.1-4.45 10.6.9 12.75-.43 1.1-.98 2.22-1.6 3.28h-1.68v-.02l-1.6.02v-3.23l-3.32-.02-.13-5.23zm-3.15-13.8a6.38 6.38 0 0 0 1.5-4.68 6.55 6.55 0 0 0-4.22 2.18 6.13 6.13 0 0 0-1.55 4.5 5.25 5.25 0 0 0 4.27-2z" transform="scale(0.85) translate(2.5, 1)" />
+  </svg>
+);
+
+const FacebookIcon = () => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="#1877F2" xmlns="http://www.w3.org/2000/svg">
+    <path d="M24 12.07C24 5.41 18.63 0 12 0S0 5.4 0 12.07C0 18.1 4.39 23.1 10.13 24v-8.44H7.08v-3.49h3.04V9.41c0-3.02 1.8-4.7 4.54-4.7 1.31 0 2.68.24 2.68.24v2.97h-1.5c-1.5 0-1.96.93-1.96 1.89v2.26h3.32l-.53 3.5h-2.8V24C19.62 23.1 24 18.1 24 12.07z" />
+  </svg>
 );
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login } = useAuth();
+  const { login, loginWithGoogle, loginWithApple, loginWithFacebook } = useAuth();
 
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
@@ -56,12 +66,21 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
     try {
-      const authed = await login(identifier, useOtp ? undefined : password, useOtp ? otp : undefined);
+      const authed = await login(identifier.trim().toLowerCase(), useOtp ? undefined : password, useOtp ? otp : undefined);
       router.push(authed.needsOnboarding ? '/app/onboarding' : '/app/home');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to log in. Please try again.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSocialAuth = async (action: () => Promise<void>, providerName: string) => {
+    setError(null);
+    try {
+      await action();
+    } catch (err) {
+      setError((err as Error)?.message || `${providerName} sign-in is not configured yet.`);
     }
   };
 
@@ -78,14 +97,16 @@ export default function LoginPage() {
         <div className="absolute bottom-[-10%] right-[-20%] w-[100%] aspect-square bg-gradient-radial from-[#855CF6]/15 to-transparent blur-[100px] pointer-events-none mix-blend-screen" />
 
         <header className="flex items-center justify-between px-6 pt-safe-top mt-4 relative z-10">
-          <Link href="/" className="p-2 -ml-2 text-white/70 hover:text-white">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+          <Link href="/" className="p-2 -ml-2 text-white/70 hover:text-white" aria-label="Home">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m15 18-6-6 6-6" />
+            </svg>
           </Link>
         </header>
 
         <div className="flex-1 flex flex-col px-6 pt-6 pb-6 relative z-10 w-full max-w-sm mx-auto">
           <BrandLogo />
-          
+
           <div className="text-center mb-8">
             <h1 className="text-[28px] font-bold text-white mb-2">Welcome Back</h1>
             <p className="text-[13px] text-white/60 mx-auto max-w-[280px]">
@@ -94,13 +115,13 @@ export default function LoginPage() {
           </div>
 
           <form onSubmit={handleLogin} className="space-y-4">
-            <Input 
-              prefix={<MailIcon />} 
-              type={useOtp ? 'tel' : 'text'} 
-              placeholder={useOtp ? '+1 555 000 1234' : 'Email Address'} 
-              value={identifier} 
-              onChange={(e) => setIdentifier(e.target.value)} 
-              required 
+            <Input
+              prefix={<MailIcon />}
+              type={useOtp ? 'tel' : 'text'}
+              placeholder={useOtp ? '+1 555 000 1234' : 'Email Address or Phone'}
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
+              required
               className="rounded-xl border-white/10 focus:ring-[#FF2D8F]/50 focus:border-[#FF2D8F]"
             />
             {useOtp ? (
@@ -115,21 +136,27 @@ export default function LoginPage() {
                 className="rounded-xl border-white/10 focus:ring-[#FF2D8F]/50 focus:border-[#FF2D8F]"
               />
             ) : (
-              <PasswordInput 
-                prefix={<LockIcon />} 
-                placeholder="Password" 
-                value={password} 
-                onChange={(e) => setPassword(e.target.value)} 
-                required 
+              <PasswordInput
+                prefix={<LockIcon />}
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
                 className="rounded-xl border-white/10 focus:ring-[#FF2D8F]/50 focus:border-[#FF2D8F]"
               />
             )}
 
             <div className="flex items-center justify-between px-2 pt-1">
-              <button type="button" onClick={toggleOtp} className="text-xs font-semibold text-[#FF2D8F] hover:text-[#FF006E] transition-colors uppercase tracking-wider">
+              <button
+                type="button"
+                onClick={toggleOtp}
+                className="text-xs font-semibold text-[#FF2D8F] hover:text-[#FF006E] transition-colors uppercase tracking-wider"
+              >
                 {useOtp ? 'Use password' : 'Use one-time code'}
               </button>
-              <Link href="/auth/forgot-password" className="text-xs font-semibold text-white/40 hover:text-white transition-colors uppercase tracking-wider">Forgot?</Link>
+              <Link href="/auth/forgot-password" className="text-xs font-semibold text-white/40 hover:text-white transition-colors uppercase tracking-wider">
+                Forgot?
+              </Link>
             </div>
 
             {error && (
@@ -138,8 +165,8 @@ export default function LoginPage() {
               </div>
             )}
 
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               disabled={loading}
               className="relative flex items-center justify-center w-full h-[56px] rounded-full bg-gradient-to-r from-[#FF2D8F] to-[#855CF6] text-white text-[17px] font-semibold shadow-[0_0_24px_rgba(255,45,143,0.3)] hover:shadow-[0_0_32px_rgba(255,45,143,0.4)] active:scale-95 transition-all mt-6 disabled:opacity-70 disabled:active:scale-100"
             >
@@ -148,7 +175,9 @@ export default function LoginPage() {
               ) : (
                 <>
                   Log in
-                  <svg className="absolute right-6 w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M12 5l7 7-7 7"/></svg>
+                  <svg className="absolute right-6 w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M12 5l7 7-7 7" />
+                  </svg>
                 </>
               )}
             </button>
@@ -161,20 +190,37 @@ export default function LoginPage() {
           </div>
 
           <div className="grid grid-cols-3 gap-4 mt-6 mb-8">
-            <button type="button" className="flex items-center justify-center h-14 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 active:scale-95 transition-all">
+            <button
+              type="button"
+              onClick={() => handleSocialAuth(loginWithGoogle, 'Google')}
+              className="flex items-center justify-center h-14 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 active:scale-95 transition-all"
+              title="Sign in with Google"
+            >
               <GoogleIcon />
             </button>
-            <button type="button" className="flex items-center justify-center h-14 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 active:scale-95 transition-all">
+            <button
+              type="button"
+              onClick={() => handleSocialAuth(loginWithApple, 'Apple')}
+              className="flex items-center justify-center h-14 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 active:scale-95 transition-all"
+              title="Sign in with Apple"
+            >
               <AppleIcon />
             </button>
-            <button type="button" className="flex items-center justify-center h-14 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 active:scale-95 transition-all">
+            <button
+              type="button"
+              onClick={() => handleSocialAuth(loginWithFacebook, 'Facebook')}
+              className="flex items-center justify-center h-14 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 active:scale-95 transition-all"
+              title="Sign in with Facebook"
+            >
               <FacebookIcon />
             </button>
           </div>
-          
+
           <div className="mt-auto pt-6 text-center">
             <span className="text-[13px] text-white/70">Don't have an account? </span>
-            <Link href="/auth/register" className="text-[13px] font-bold text-[#FF2D8F] hover:text-[#FF006E]">Sign Up</Link>
+            <Link href="/auth/register" className="text-[13px] font-bold text-[#FF2D8F] hover:text-[#FF006E]">
+              Sign Up
+            </Link>
           </div>
         </div>
       </div>

@@ -11,7 +11,7 @@ import { generateToken } from '@vuzki/utils';
 export const subscriptionRoutes = Router();
 
 // GET /subscriptions/plans
-subscriptionRoutes.get('/plans', authenticate(), wrap(async (_req: AuthedRequest, res) => {
+subscriptionRoutes.get('/plans', wrap(async (_req, res) => {
   const plans = await prisma.subscriptionPlan.findMany({ where: { isActive: true }, orderBy: { price: 'asc' } });
   const grouped = plans.reduce((acc: Record<string, any[]>, p) => {
     (acc[p.tier] = acc[p.tier] || []).push({

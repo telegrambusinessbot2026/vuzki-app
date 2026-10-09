@@ -32,20 +32,27 @@ reportRoutes.post('/', authenticate(), wrap(async (req: AuthedRequest, res) => {
 
   if (me === reportedUserId) throw new ApiErrorResponse(400, 'BAD_REQUEST', 'Cannot report yourself');
 
-  const target = await prisma.user.findUnique({ where: { id: reportedUserId } });
+  const cleanId = reportedUserId.replace(/^@/, '').trim();
+  let target = await prisma.user.findUnique({ where: { id: reportedUserId } });
+  if (!target && cleanId && cleanId !== reportedUserId) {
+    target = await prisma.user.findUnique({ where: { username: cleanId } });
+  }
   if (!target) throw new ApiErrorResponse(404, 'USER_NOT_FOUND', 'User not found');
+  const targetUserId = target.id;
+
+  if (me === targetUserId) throw new ApiErrorResponse(400, 'BAD_REQUEST', 'Cannot report yourself');
 
   // AI assist: run moderation to prioritize report (not auto-ban)
   const modResult = description
-    ? await moderateText(description, { type: 'report', userId: reportedUserId })
+    ? await moderateText(description, { type: 'report', userId: targetUserId })
     : null;
 
   const report = await prisma.report.create({
     data: {
       reporterId: me,
-      reportedUserId,
+      reportedUserId: targetUserId,
       targetType,
-      targetId,
+      targetId: targetId || targetUserId,
       category,
       description,
       status: ReportStatus.PENDING,
@@ -59,7 +66,7 @@ reportRoutes.post('/', authenticate(), wrap(async (req: AuthedRequest, res) => {
   // repeat offenders (proportional + reversible), not just a dead-end row.
   const pipeline = await processReportIntoCase({
     reportId: report.id,
-    reportedUserId,
+    reportedUserId: targetUserId,
     category,
     aiScore: modResult?.score,
     aiCategories: modResult?.categories,

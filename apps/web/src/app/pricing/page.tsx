@@ -52,14 +52,17 @@ const FAQ = [
   },
 ];
 
+import { useAuth } from '@/lib/auth-context';
+
 export default function PricingPage() {
+  const { isAuthenticated } = useAuth();
   const [plans, setPlans] = useState<PlanCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
     let cancelled = false;
-    api<{ plans: Record<string, Plan[]> }>('/subscriptions/plans', { auth: true })
+    api<{ plans: Record<string, Plan[]> }>('/subscriptions/plans', { auth: false })
       .then((data) => {
         if (cancelled) return;
         const order = ['PLUS', 'PREMIUM', 'VIP'];
@@ -152,14 +155,14 @@ export default function PricingPage() {
               </ul>
 
               <Link
-                href="/auth/login"
+                href={isAuthenticated ? '/app/premium' : `/auth/register?plan=${plan.id}`}
                 className={`mt-8 inline-flex items-center justify-center px-6 py-3 rounded-2xl font-semibold transition-opacity ${
                   plan.highlighted
                     ? 'bg-brand-gradient text-white shadow-glow hover:opacity-95'
                     : 'bg-surface-overlay text-white border border-surface-border hover:border-brand-500/50'
                 }`}
               >
-                Get Started
+                {isAuthenticated ? 'Upgrade Now' : 'Get Started'}
               </Link>
             </div>
           ))}

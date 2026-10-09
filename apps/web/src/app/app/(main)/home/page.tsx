@@ -9,6 +9,7 @@ import type { FeedUser, PublicUser } from '@/lib/api-users';
 import { Spinner } from '@/components/ui/Button';
 import { SearchIcon, BellIcon } from '@/components/ui/Icons';
 import { FeedCard } from '@/components/domain/FeedCard';
+import { VuzkiLogo } from '@/components/ui/VuzkiLogo';
 
 export default function HomePage() {
   const { user } = useAuth();
@@ -42,9 +43,7 @@ export default function HomePage() {
     <div className="pt-safe pb-24 min-h-dvh flex flex-col bg-[#0a0a0c]">
       {/* Header */}
       <header className="px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <h1 className="text-2xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-[#FF4DBD] to-[#A855F7]">VUZKI</h1>
-        </div>
+        <VuzkiLogo size={28} showTagline={false} />
         <div className="flex items-center gap-4">
           <Link href="/app/search" className="text-white/80 hover:text-white">
             <SearchIcon size={24} />

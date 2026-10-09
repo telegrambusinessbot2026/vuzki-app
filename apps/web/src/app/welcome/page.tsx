@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { BrandLogo } from '@/components/ui/BrandLogo';
+import { VuzkiLogo } from '@/components/ui/VuzkiLogo';
 import { BRAND_CONFIG } from '@/config/assets/assets.config';
 
 export default function WelcomeCarousel() {
@@ -32,14 +32,8 @@ export default function WelcomeCarousel() {
 
       {/* Header */}
       <header className="relative z-10 flex items-center justify-between px-6 pt-safe-top mt-4">
-        <div className="flex items-center gap-2">
-          <BrandLogo />
-          <div>
-            <h1 className="text-lg font-black tracking-tight text-white leading-none">VUZKI</h1>
-            <p className="text-[7px] text-white/70">Real People. Real Connections.</p>
-          </div>
-        </div>
-        <Link href="/auth/register" className="text-sm font-medium text-white/70 hover:text-white">
+        <VuzkiLogo size={36} href="/" />
+        <Link href="/auth/register" className="text-sm font-semibold text-white/70 hover:text-white px-3 py-1.5 rounded-full bg-white/5 border border-white/10 transition-colors">
           Skip
         </Link>
       </header>

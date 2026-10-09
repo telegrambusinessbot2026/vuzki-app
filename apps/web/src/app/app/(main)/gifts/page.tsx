@@ -20,7 +20,7 @@ interface Gift {
 
 const FALLBACK_CATEGORIES = ['All', 'Romance', 'Luxury', 'Praise', 'Fun'];
 
-export default function GiftsPage() {
+function GiftsContent() {
   const { user, refresh } = useAuth();
   const [category, setCategory] = useState('All');
   const balance = user?.wallet?.balance ?? 0;
@@ -178,5 +178,19 @@ export default function GiftsPage() {
 
       <Divider className="my-4" />
     </div>
+  );
+}
+
+export default function GiftsPage() {
+  return (
+    <React.Suspense
+      fallback={
+        <div className="pt-safe pb-24 px-4 flex items-center justify-center min-h-[50vh]">
+          <div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      }
+    >
+      <GiftsContent />
+    </React.Suspense>
   );
 }

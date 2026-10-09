@@ -1,4 +1,6 @@
+import React from 'react';
 import Link from 'next/link';
+import { VuzkiLogo } from '@/components/ui/VuzkiLogo';
 
 const COLUMNS = [
   {
@@ -11,21 +13,20 @@ const COLUMNS = [
     ],
   },
   {
-    title: 'Company',
+    title: 'Platform',
     links: [
-      { label: 'About', href: '/features' },
-      { label: 'Careers', href: '/blog' },
-      { label: 'Press', href: '/blog' },
-      { label: 'Contact', href: '/' },
+      { label: 'Web App', href: '/welcome' },
+      { label: 'Safety Guidelines', href: '/safety' },
+      { label: 'Talk Now', href: '/welcome' },
+      { label: 'Admin Portal', href: '/admin/login' },
     ],
   },
   {
     title: 'Legal',
     links: [
-      { label: 'Privacy Policy', href: '/safety' },
-      { label: 'Terms of Service', href: '/safety' },
+      { label: 'Privacy Policy', href: '/privacy' },
+      { label: 'Terms of Service', href: '/terms' },
       { label: 'Community Guidelines', href: '/safety' },
-      { label: 'Cookie Policy', href: '/safety' },
     ],
   },
 ];
@@ -36,16 +37,11 @@ export default function MarketingFooter() {
       <div className="max-w-6xl mx-auto px-4 py-14">
         <div className="grid grid-cols-2 md:grid-cols-5 gap-10">
           <div className="col-span-2">
-            <div className="flex items-center gap-2 mb-4">
-              <span className="inline-flex items-center justify-center h-8 w-8 rounded-lg bg-brand-gradient shadow-glow">
-                <span className="text-base font-extrabold text-white">V</span>
-              </span>
-              <span className="text-lg font-extrabold tracking-tight">
-                <span className="bg-gradient-to-r from-brand-400 to-pink-500 bg-clip-text text-transparent">VUZKI</span>
-              </span>
+            <div className="mb-4">
+              <VuzkiLogo size={32} showTagline={true} />
             </div>
             <p className="text-sm text-white/50 max-w-xs leading-relaxed">
-              Meet • Talk • Connect. A premium social platform where millions around the world come together for live audio and video conversations.
+              Meet • Talk • Connect. A premium social connection platform where real people discover genuine friendships and live conversations worldwide.
             </p>
           </div>
 
@@ -67,7 +63,7 @@ export default function MarketingFooter() {
 
         <div className="mt-12 pt-8 border-t border-surface-border flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-xs text-white/40">© {new Date().getFullYear()} VUZKI. All rights reserved.</p>
-          <p className="text-xs text-white/40">Made with care for the global community. 💜</p>
+          <p className="text-xs text-white/40">Designed for authentic, safe connections worldwide. 💜</p>
         </div>
       </div>
     </footer>

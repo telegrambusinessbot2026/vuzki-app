@@ -9,6 +9,7 @@ import { verifyOtp } from '../services/otp';
 import { AccountStatus, OnboardingStep, WalletTransactionType } from '@vuzki/shared';
 import { debitCoins } from '../services/wallet';
 import { getPresence } from '../realtime/presence';
+import { viewRestrictionStatus, submitAppeal } from '../services/appeals';
 
 export const userRoutes = Router();
 
@@ -384,3 +385,91 @@ userRoutes.put('/me/online', authenticate(), wrap(async (req: AuthedRequest, res
   });
   res.json({ success: true, data: { online: effectiveOnline } });
 }));
+
+// GET /users/me/appeals - view user restriction status and submitted appeals/support requests
+userRoutes.get('/me/appeals', authenticate(), wrap(async (req: AuthedRequest, res) => {
+  const userId = req.auth!.userId;
+  const status = await viewRestrictionStatus(userId);
+  res.json({ success: true, data: status });
+}));
+
+// POST /users/me/appeals - submit an appeal or support request
+userRoutes.post('/me/appeals', authenticate(), wrap(async (req: AuthedRequest, res) => {
+  const userId = req.auth!.userId;
+  const { restrictionType, message, reason, caseId } = z.object({
+    restrictionType: z.string().default('SUPPORT_TICKET'),
+    message: z.string().max(2000),
+    reason: z.string().max(200).optional(),
+    caseId: z.string().optional(),
+  }).parse(req.body);
+
+  const appeal = await submitAppeal({
+    userId,
+    restrictionType,
+    message,
+    caseId,
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      actorId: userId,
+      actorType: 'USER',
+      action: 'APPEAL_SUBMITTED',
+      entityType: 'Appeal',
+      entityId: appeal.id,
+      metadata: { restrictionType, reason },
+    },
+  }).catch(() => {});
+
+  res.status(201).json({ success: true, data: appeal });
+}));
+
+// DELETE /users/me - user self-service account deletion
+userRoutes.delete('/me', authenticate(), wrap(async (req: AuthedRequest, res) => {
+  const userId = req.auth!.userId;
+  const { reason } = z.object({ reason: z.string().max(500).optional() }).parse(req.body ?? {});
+
+  await prisma.$transaction(async (tx) => {
+    await tx.user.update({
+      where: { id: userId },
+      data: {
+        status: AccountStatus.DELETED,
+        deletedAt: new Date(),
+        onlineStatus: false,
+      },
+    });
+
+    await tx.session.updateMany({
+      where: { userId, isActive: true },
+      data: { isActive: false },
+    });
+
+    await tx.accountDeletion.upsert({
+      where: { userId },
+      create: {
+        userId,
+        status: 'PENDING',
+        reason: reason || 'User requested account deletion',
+      },
+      update: {
+        status: 'PENDING',
+        reason: reason || 'User requested account deletion',
+        requestedAt: new Date(),
+      },
+    });
+
+    await tx.auditLog.create({
+      data: {
+        actorId: userId,
+        actorType: 'USER',
+        action: 'ACCOUNT_DELETED',
+        entityType: 'User',
+        entityId: userId,
+        metadata: { reason },
+      },
+    }).catch(() => {});
+  });
+
+  res.json({ success: true, message: 'Account scheduled for deletion and sessions revoked.' });
+}));
+
