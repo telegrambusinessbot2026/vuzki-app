@@ -247,6 +247,17 @@ of separate api/worker/admin containers:
 - Secrets required in production (fail-fast if missing): `JWT_SECRET`,
   `JWT_REFRESH_SECRET`, `SESSION_SECRET`, `ADMIN_JWT_SECRET`, `DATABASE_URL`,
   `REDIS_URL` (see `apps/api/src/config/index.ts`).
+- **Production Guardrails & Domain Variables:**
+  - **Payments:** `PAYMENT_PROVIDER=phonepe`, `DEMO_MODE=false`. Demo payment fulfillment is strictly forbidden in production. Live orders require PhonePe credentials (`PHONEPE_MERCHANT_ID`, `PHONEPE_SALT_KEY`, `PHONEPE_SALT_INDEX=1`, `PHONEPE_ENV=PROD`).
+  - **Email OTP Delivery:** `SMTP_HOST`, `SMTP_PORT=587`, `SMTP_USER`, `SMTP_PASS`, `FROM_EMAIL`. In production, email OTP verification requires valid SMTP credentials. The API rejects OTP dispatch if SMTP is unconfigured rather than silently falling back to console logs.
+  - **WebRTC / TURN Relay:** `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`. Generates short-lived Twilio NTS ICE credentials. If unset, peer-to-peer signaling falls back to public Google STUN.
+  - **Social OAuth:**
+    - Google: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `NEXT_PUBLIC_GOOGLE_CLIENT_ID`.
+    - Apple: `APPLE_CLIENT_ID`, `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY`, `NEXT_PUBLIC_APPLE_CLIENT_ID`.
+    - Facebook: `FACEBOOK_APP_ID`, `FACEBOOK_APP_SECRET`, `NEXT_PUBLIC_FACEBOOK_CLIENT_ID`.
+  - **Push Notifications (Firebase):** `PUSH_PROVIDER=fcm`, `FCM_SERVER_KEY` (service account JSON string), plus client-safe `NEXT_PUBLIC_FIREBASE_*` keys.
+  - **Storage:** `STORAGE_PROVIDER=local` (ephemeral disk) or `STORAGE_PROVIDER=s3` with `S3_BUCKET`, `S3_REGION`, `S3_ACCESS_KEY`, `S3_SECRET_KEY` for durable, CDN-backed uploads.
+  - **Public Variables:** Only browser-safe public identifiers may be prefixed with `NEXT_PUBLIC_*`. Secrets (API keys, private keys, database credentials) must NEVER be exposed via `NEXT_PUBLIC_*`.
 - The separate `apps/admin` / `apps/website` apps and the `vuzki-worker` image
   are NOT deployed in this topology; they remain for rollback/reference.
 

@@ -30,7 +30,9 @@ function normalizeProvider(p?: string | null): string | undefined {
 }
 
 // True only when the server is explicitly configured for demo fulfillment.
+// In production, demo fulfillment is strictly forbidden.
 function serverIsDemo(): boolean {
+  if (config.isProd) return false;
   return config.demoMode || normalizeProvider(config.paymentProvider) === PaymentProvider.DEMO;
 }
 
@@ -125,7 +127,7 @@ export async function createCoinsOrder(userId: string, packageId: string, provid
   if (!serverIsDemo() && (activeProviderN === PaymentProvider.DEMO || clientProviderN === undefined)) {
     activeProviderN = serverProviderN;
   }
-  if (!activeProviderN) {
+  if (!activeProviderN || (config.isProd && activeProviderN === PaymentProvider.DEMO)) {
     throw new ApiErrorResponse(500, 'PAYMENT_PROVIDER_UNCONFIGURED', 'No payment provider configured');
   }
   const activeProvider = activeProviderN.toLowerCase() as PaymentProvider;

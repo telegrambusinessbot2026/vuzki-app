@@ -49,7 +49,12 @@ export async function sendOtp(identifier: string, purpose: 'registration' | 'log
 }
 
 async function sendEmailOtp(to: string, code: string, purpose: string) {
-  if (config.smtpUser === '') return; // no smtp configured, dev only
+  if (!config.smtpUser) {
+    if (config.isProd) {
+      throw new Error('Email delivery is not configured on this server. SMTP_USER and SMTP_PASS must be set in production.');
+    }
+    return; // no smtp configured, dev only
+  }
   const transporter = nodemailer.createTransport({
     host: config.smtpHost,
     port: config.smtpPort,
@@ -64,6 +69,9 @@ async function sendEmailOtp(to: string, code: string, purpose: string) {
     });
   } catch (e) {
     console.error('[OTP email failed]', e);
+    if (config.isProd) {
+      throw new Error('Failed to deliver verification email. Please verify SMTP credentials.');
+    }
   }
 }
 

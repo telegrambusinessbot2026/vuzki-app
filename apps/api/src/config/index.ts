@@ -135,7 +135,7 @@ export const config = {
   applePrivateKey: process.env.APPLE_PRIVATE_KEY || '',
 
   // Payments
-  paymentProvider: process.env.PAYMENT_PROVIDER || 'demo', // demo | razorpay | phonepe | cashfree | stripe
+  paymentProvider: process.env.PAYMENT_PROVIDER || (isProd ? 'phonepe' : 'demo'), // demo | razorpay | phonepe | cashfree | stripe
   razorpayKeyId: process.env.RAZORPAY_KEY_ID || '',
   razorpayKeySecret: process.env.RAZORPAY_KEY_SECRET || '',
   stripeSecretKey: process.env.STRIPE_SECRET_KEY || '',
@@ -192,7 +192,7 @@ export const config = {
 
   // Currency
   currency: process.env.CURRENCY || 'INR',
-  demoMode: process.env.DEMO_MODE === 'true',
+  demoMode: !isProd && process.env.DEMO_MODE === 'true',
 };
 
 export type AppConfig = typeof config;

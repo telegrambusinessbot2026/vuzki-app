@@ -80,6 +80,84 @@ services:
         value: VUZKI
       - key: NEXT_PUBLIC_SITE_URL
         value: https://vuzki.app
+      - key: NEXT_PUBLIC_GOOGLE_CLIENT_ID
+        sync: false
+      - key: NEXT_PUBLIC_APPLE_CLIENT_ID
+        sync: false
+      - key: NEXT_PUBLIC_FACEBOOK_CLIENT_ID
+        sync: false
+      - key: NEXT_PUBLIC_FIREBASE_API_KEY
+        sync: false
+      - key: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+        sync: false
+      - key: NEXT_PUBLIC_FIREBASE_APP_ID
+        sync: false
+      - key: NEXT_PUBLIC_FIREBASE_VAPID_KEY
+        sync: false
+
+      # ---- Payments (PhonePe Production Gateway) ----
+      - key: PAYMENT_PROVIDER
+        value: phonepe
+      - key: DEMO_MODE
+        value: "false"
+      - key: CURRENCY
+        value: INR
+      - key: PHONEPE_MERCHANT_ID
+        sync: false
+      - key: PHONEPE_SALT_KEY
+        sync: false
+      - key: PHONEPE_SALT_INDEX
+        value: "1"
+      - key: PHONEPE_ENV
+        value: PROD
+
+      # ---- WebRTC / Twilio TURN Relay ----
+      - key: RTC_PROVIDER
+        value: webrtc
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+
+      # ---- Email OTP Delivery (SMTP) ----
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: FROM_EMAIL
+        value: no-reply@vuzki.app
+
+      # ---- Social OAuth (Backend Verification) ----
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: APPLE_CLIENT_ID
+        sync: false
+      - key: APPLE_TEAM_ID
+        sync: false
+      - key: APPLE_KEY_ID
+        sync: false
+      - key: APPLE_PRIVATE_KEY
+        sync: false
+      - key: FACEBOOK_APP_ID
+        sync: false
+      - key: FACEBOOK_APP_SECRET
+        sync: false
+
+      # ---- Push Notifications (Firebase Admin) ----
+      - key: PUSH_PROVIDER
+        value: "off"
+      - key: FCM_SERVER_KEY
+        sync: false
+
+      # ---- Storage ----
+      - key: STORAGE_PROVIDER
+        value: local
 
   # ------------------------------------------------------------------
   # CONSOLIDATED TOPOLOGY NOTE

@@ -163,7 +163,7 @@ subscriptionRoutes.post('/verify', authenticate(), wrap(async (req: AuthedReques
   // SECURITY: demo activation is ONLY permitted when the server is configured
   // for demo fulfillment AND the order was created under the demo provider.
   // A client can never force-fill a real order by sending demo:true.
-  const serverIsDemo = config.demoMode || config.paymentProvider === 'demo';
+  const serverIsDemo = !config.isProd && (config.demoMode || config.paymentProvider === 'demo');
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const _ignoredDemo = req.body?.demo;
 
