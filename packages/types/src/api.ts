@@ -31,6 +31,7 @@ export class ApiErrorResponse extends Error {
     this.status = status;
     this.details = details;
     this.fieldErrors = fieldErrors;
+    Object.setPrototypeOf(this, ApiErrorResponse.prototype);
   }
 }
 

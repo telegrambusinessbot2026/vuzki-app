@@ -11,23 +11,42 @@ export function notFound(req: Request, res: Response) {
 }
 
 export function errorHandler(err: unknown, _req: Request, res: Response, _next: NextFunction) {
-  if (err instanceof ApiErrorResponse) {
-    return res.status(err.status).json({
+  const isApiError =
+    err instanceof ApiErrorResponse ||
+    (typeof err === 'object' &&
+      err !== null &&
+      'status' in err &&
+      'code' in err &&
+      typeof (err as any).status === 'number' &&
+      typeof (err as any).code === 'string');
+
+  if (isApiError) {
+    const apiErr = err as ApiErrorResponse;
+    return res.status(apiErr.status).json({
       success: false,
       error: {
-        code: err.code,
-        message: err.message,
-        details: err.details,
-        fieldErrors: err.fieldErrors,
+        code: apiErr.code,
+        message: apiErr.message,
+        details: apiErr.details,
+        fieldErrors: apiErr.fieldErrors,
       },
     });
   }
 
-  if (err instanceof ZodError) {
+  const isZodError =
+    err instanceof ZodError ||
+    (typeof err === 'object' &&
+      err !== null &&
+      ((err as any).name === 'ZodError' || Array.isArray((err as any).issues)));
+
+  if (isZodError) {
+    const zodErr = err as ZodError;
     const fieldErrors: Record<string, string> = {};
-    for (const issue of err.issues) {
-      const path = issue.path.join('.');
-      fieldErrors[path] = issue.message;
+    if (Array.isArray(zodErr.issues)) {
+      for (const issue of zodErr.issues) {
+        const path = issue.path.join('.');
+        fieldErrors[path] = issue.message;
+      }
     }
     return res.status(400).json({
       success: false,
