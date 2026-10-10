@@ -32,6 +32,9 @@ export default function ReferralPage() {
     };
   }, []);
 
+  const [claiming, setClaiming] = useState(false);
+  const [claimSuccess, setClaimSuccess] = useState<string | null>(null);
+
   const code = data?.referralCode || 'VUZKI';
   const link = data?.referralLink || '';
 
@@ -41,6 +44,32 @@ export default function ReferralPage() {
     } catch {}
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
+  };
+
+  const share = async () => {
+    if (typeof navigator !== 'undefined' && navigator.share && link) {
+      try {
+        await navigator.share({ title: 'Join me on VUZKI', url: link });
+        return;
+      } catch {}
+    }
+    copy();
+  };
+
+  const claimReward = async () => {
+    setClaiming(true);
+    setError('');
+    setClaimSuccess(null);
+    try {
+      const res = await api<{ claimed: boolean; coins: number }>('/referrals/claim-reward', { method: 'POST', auth: true });
+      setClaimSuccess(`Claimed ${res.coins} coins!`);
+      const updated = await api<ReferralData>('/referrals', { auth: true });
+      setData(updated);
+    } catch (e) {
+      setError((e as Error)?.message || 'Failed to claim reward');
+    } finally {
+      setClaiming(false);
+    }
   };
 
   return (
@@ -79,11 +108,24 @@ export default function ReferralPage() {
         </Card>
       </div>
 
+      {data?.stats?.eligible && data.stats.eligible > 0 ? (
+        <Card className="p-4 mb-5 border-amber-500/30 bg-amber-500/10 flex items-center justify-between">
+          <div>
+            <p className="font-bold text-amber-400 text-sm">Reward Ready to Claim!</p>
+            <p className="text-xs text-white/60">{data.stats.eligible} qualified friends ({data.stats.eligible * 50} coins)</p>
+          </div>
+          <Button size="sm" variant="gradient" onClick={claimReward} disabled={claiming}>
+            {claiming ? 'Claiming...' : 'Claim Coins'}
+          </Button>
+        </Card>
+      ) : null}
+
       {error && <p className="text-xs text-red-400 mb-3">{error}</p>}
+      {claimSuccess && <p className="text-xs text-green-400 mb-3">{claimSuccess}</p>}
 
       <div className="grid grid-cols-2 gap-3 mb-5">
-        <Button variant="gradient" size="lg" icon={<ShareIcon size={18} />}>Share link</Button>
-        <Button variant="outline" size="lg" icon={<LinkIcon size={18} />} onClick={copy}>Copy link</Button>
+        <Button variant="gradient" size="lg" icon={<ShareIcon size={18} />} onClick={share}>Share link</Button>
+        <Button variant="outline" size="lg" icon={<LinkIcon size={18} />} onClick={copy}>Copy code</Button>
       </div>
 
       <Divider className="mb-4" />

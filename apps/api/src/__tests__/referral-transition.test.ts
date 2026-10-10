@@ -42,4 +42,9 @@ describe('Referral Eligibility Transition', () => {
       }
     });
   });
+
+  it('safely handles transaction clients without referral client', async () => {
+    const txMock = {};
+    await expect(transitionReferralToEligible('u123', txMock as any)).resolves.not.toThrow();
+  });
 });

@@ -6,6 +6,7 @@ import { ApiErrorResponse } from '@vuzki/types';
 import { creditCoins, debitCoins } from './wallet';
 import { checkPaymentAnomalies } from './fraud';
 import { generateToken } from '@vuzki/utils';
+import { transitionReferralToEligible } from './referrals';
 
 // Server-side payment orchestration.
 // Production must use a real provider (Razorpay/Cashfree/Stripe).
@@ -246,6 +247,7 @@ export async function handlePaymentSuccess(params: { orderId: string; provider: 
           `PAY:${payment.orderId}`,
           tx
         );
+        await transitionReferralToEligible(payment.userId, tx);
       }
     } else if (payment.purpose === 'SUBSCRIPTION' && payment.relatedId) {
       // Production subscription fulfillment: a successful (webhook-verified)

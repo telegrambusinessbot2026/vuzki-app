@@ -9,6 +9,7 @@ import {
   AUDIO_CALL_CREATOR_SHARE,
   VIDEO_CALL_CREATOR_SHARE,
 } from '@vuzki/shared';
+import { transitionReferralToEligible } from './referrals';
 
 // A user can only ever be part of one live (non-terminal) call at a time.
 const ACTIVE_CALL_STATUSES = [CallStatus.RINGING, CallStatus.ONGOING, CallStatus.BUSY];
@@ -259,6 +260,8 @@ export async function endCall(callId: string, opts?: { quality?: string; failRea
     // (now-uncollectible) amount. We catch the debit failure and mark the call
     // so it can be handled by the collections ledger/worker.
     if (billing.durationSeconds > 0) {
+      await transitionReferralToEligible(call.callerId, tx);
+      await transitionReferralToEligible(call.receiverId, tx);
       try {
         // Runs inside this transaction so the call-status transition and the
         // debit commit together; idempotencyKey blocks any replay double-charge.

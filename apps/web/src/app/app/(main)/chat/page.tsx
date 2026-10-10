@@ -125,14 +125,12 @@ export default function ChatPage() {
       <header className="flex items-center justify-between px-4 pt-6 pb-2">
         <VuzkiLogo size={28} showTagline={false} />
         <div className="flex items-center gap-4 text-white/90">
-          {tab === 'chats' ? (
-            <>
-              <SearchIcon size={24} />
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
-            </>
-          ) : (
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-          )}
+          <Link href="/app/search" className="text-white/80 hover:text-white transition-colors">
+            <SearchIcon size={24} />
+          </Link>
+          <button className="text-white/80 hover:text-white">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+          </button>
         </div>
       </header>
 
@@ -144,7 +142,7 @@ export default function ChatPage() {
             onClick={() => setTab(t)}
             className={`pb-3 text-[15px] font-semibold transition-colors relative ${tab === t ? 'text-white' : 'text-white/50'}`}
           >
-            {t === 'chats' ? 'Chats' : t === 'calls' ? 'Calls' : 'Requests (3)'}
+            {t === 'chats' ? 'Chats' : t === 'calls' ? 'Calls' : 'Requests'}
             {tab === t && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#FF4DBD] rounded-t-full" />}
           </button>
         ))}
@@ -227,10 +225,14 @@ export default function ChatPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-3 shrink-0 ml-2">
-                      <button className="w-10 h-10 rounded-full bg-[#FF4DBD]/10 text-[#FF4DBD] flex items-center justify-center">
+                      <Link
+                        href={`/app/call/${c.other.id}?type=${c.type.toLowerCase()}&name=${encodeURIComponent(c.other.displayName)}`}
+                        className="w-10 h-10 rounded-full bg-[#FF4DBD]/10 text-[#FF4DBD] flex items-center justify-center hover:bg-[#FF4DBD]/20 transition-colors"
+                        title={c.type === 'VIDEO' ? 'Video Call' : 'Audio Call'}
+                      >
                         {c.type === 'VIDEO' ? <VideoIcon size={18} /> : <PhoneIcon size={18} />}
-                      </button>
-                      <button className="text-white/40">
+                      </Link>
+                      <button className="text-white/40 hover:text-white/70">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
                       </button>
                     </div>
@@ -244,10 +246,25 @@ export default function ChatPage() {
                 <h4 className="font-bold text-amber-500">Go Premium</h4>
                 <p className="text-xs text-amber-500/80">Unlimited video calls</p>
               </div>
-              <button className="px-4 py-2 bg-amber-500 text-black text-sm font-bold rounded-full">
+              <Link href="/app/premium" className="px-4 py-2 bg-amber-500 text-black text-sm font-bold rounded-full hover:bg-amber-400 transition-colors">
                 Upgrade
-              </button>
+              </Link>
             </div>
+          </div>
+        )}
+
+        {tab === 'requests' && (
+          <div className="px-4 py-12 flex flex-col items-center justify-center text-center">
+            <div className="h-16 w-16 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-2xl mb-4">
+              💬
+            </div>
+            <h3 className="text-lg font-bold text-white mb-1">No Pending Requests</h3>
+            <p className="text-sm text-white/50 max-w-xs mb-6">
+              When people outside your matches want to message you, their requests will appear here.
+            </p>
+            <Link href="/app/discover" className="px-6 py-2.5 rounded-full bg-[#FF4DBD] text-white text-sm font-bold shadow-[0_0_15px_rgba(255,77,189,0.4)] hover:brightness-110 transition-all">
+              Discover People
+            </Link>
           </div>
         )}
       </div>

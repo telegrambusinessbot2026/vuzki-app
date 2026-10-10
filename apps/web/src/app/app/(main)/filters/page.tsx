@@ -30,7 +30,13 @@ export default function FiltersPage() {
     setInterests((s) => (s.includes(val) ? s.filter((x) => x !== val) : [...s, val]));
 
   const apply = () => {
-    router.push('/app/discover');
+    const params = new URLSearchParams();
+    if (gender && gender !== 'All') params.set('gender', gender);
+    if (minAge) params.set('minAge', minAge);
+    if (maxAge) params.set('maxAge', maxAge);
+    if (distance && distance !== 'any') params.set('distance', distance);
+    if (interests.length > 0) params.set('interest', interests[0]);
+    router.push(`/app/discover?${params.toString()}`);
   };
 
   return (

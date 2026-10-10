@@ -13,12 +13,14 @@ import { VuzkiLogo } from '@/components/ui/VuzkiLogo';
 
 export default function HomePage() {
   const { user } = useAuth();
+  const [tab, setTab] = useState<'for_you' | 'nearby' | 'new' | 'popular'>('for_you');
   const [feed, setFeed] = useState<FeedUser[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
-    api<{ items: (PublicUser & { compatibilityScore?: number; matchLabel?: string })[] }>('/discovery/feed?limit=20', { auth: true })
+    setLoading(true);
+    api<{ items: (PublicUser & { compatibilityScore?: number; matchLabel?: string })[] }>(`/discovery/feed?limit=20&mode=${tab}`, { auth: true })
       .then((data) => {
         if (!cancelled) setFeed((data.items ?? []).map(mapFeed));
       })
@@ -27,11 +29,11 @@ export default function HomePage() {
         if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
-  }, []);
+  }, [tab]);
 
   const stories = useMemo(() => feed.filter((u) => u.onlineStatus).slice(0, 10).map((u, i) => ({ user: u, viewed: i > 2 })), [feed]);
 
-  if (!user || loading) {
+  if (!user || (loading && feed.length === 0)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Spinner className="h-6 w-6 text-brand-500" />
@@ -58,19 +60,28 @@ export default function HomePage() {
       {/* Tabs */}
       <div className="px-4 py-2 flex items-center justify-between mb-2">
         <div className="flex items-center gap-6">
-          <div className="relative">
-            <span className="text-white font-bold text-lg pb-1">For You</span>
-            <div className="absolute -bottom-1 left-0 right-0 h-1 bg-[#FF4DBD] rounded-full" />
-          </div>
-          <span className="text-white/50 font-medium text-lg hover:text-white/80 cursor-pointer">Nearby</span>
-          <span className="text-white/50 font-medium text-lg hover:text-white/80 cursor-pointer">New</span>
-          <span className="text-white/50 font-medium text-lg hover:text-white/80 cursor-pointer">Popular</span>
+          <button onClick={() => setTab('for_you')} className="relative focus:outline-none">
+            <span className={`text-lg transition-colors ${tab === 'for_you' ? 'text-white font-bold' : 'text-white/50 font-medium hover:text-white/80'}`}>For You</span>
+            {tab === 'for_you' && <div className="absolute -bottom-1 left-0 right-0 h-1 bg-[#FF4DBD] rounded-full" />}
+          </button>
+          <button onClick={() => setTab('nearby')} className="relative focus:outline-none">
+            <span className={`text-lg transition-colors ${tab === 'nearby' ? 'text-white font-bold' : 'text-white/50 font-medium hover:text-white/80'}`}>Nearby</span>
+            {tab === 'nearby' && <div className="absolute -bottom-1 left-0 right-0 h-1 bg-[#FF4DBD] rounded-full" />}
+          </button>
+          <button onClick={() => setTab('new')} className="relative focus:outline-none">
+            <span className={`text-lg transition-colors ${tab === 'new' ? 'text-white font-bold' : 'text-white/50 font-medium hover:text-white/80'}`}>New</span>
+            {tab === 'new' && <div className="absolute -bottom-1 left-0 right-0 h-1 bg-[#FF4DBD] rounded-full" />}
+          </button>
+          <button onClick={() => setTab('popular')} className="relative focus:outline-none">
+            <span className={`text-lg transition-colors ${tab === 'popular' ? 'text-white font-bold' : 'text-white/50 font-medium hover:text-white/80'}`}>Popular</span>
+            {tab === 'popular' && <div className="absolute -bottom-1 left-0 right-0 h-1 bg-[#FF4DBD] rounded-full" />}
+          </button>
         </div>
-        <button className="text-white/70">
+        <Link href="/app/filters" className="text-white/70 hover:text-white p-1 rounded-lg hover:bg-white/5">
            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
              <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
            </svg>
-        </button>
+        </Link>
       </div>
 
       {/* Stories */}
@@ -135,9 +146,9 @@ export default function HomePage() {
             <h3 className="font-bold text-white mb-1">Go Premium! 🌟</h3>
             <p className="text-xs text-white/70">See who liked you & more</p>
           </div>
-          <button className="px-4 py-2 rounded-full bg-[#FF4DBD] text-white text-xs font-bold">
+          <Link href="/app/premium" className="px-4 py-2 rounded-full bg-[#FF4DBD] text-white text-xs font-bold hover:brightness-110 transition-all">
             Upgrade
-          </button>
+          </Link>
         </div>
       </div>
     </div>

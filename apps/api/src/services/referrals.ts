@@ -15,14 +15,15 @@ export async function transitionReferralToEligible(
   
   // Note: Since Prisma updateMany doesn't easily return the count of matched,
   // we can just run an updateMany matching referredUserId and status='PENDING'.
-  // If it updates 1, then we've successfully transitioned it to ELIGIBLE.
-  await tx.referral.updateMany({
-    where: {
-      referredUserId: referredUserId,
-      status: 'PENDING',
-    },
-    data: {
-      status: 'ELIGIBLE',
-    },
-  });
+  if (tx?.referral?.updateMany) {
+    await tx.referral.updateMany({
+      where: {
+        referredUserId: referredUserId,
+        status: 'PENDING',
+      },
+      data: {
+        status: 'ELIGIBLE',
+      },
+    });
+  }
 }

@@ -1,15 +1,59 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { HeartIcon, CloseIcon, StarIcon } from '@/components/ui/Icons';
 import { VerifiedIcon } from '@/components/ui/Avatar';
-import type { MockUser } from '@/lib/mock';
 import type { FeedUser } from '@/lib/api-users';
+import { post } from '@/lib/api';
 
-type UserProp = MockUser | FeedUser | any;
+export function FeedCard({
+  user,
+  onPass,
+  onLike,
+  onSuperLike,
+}: {
+  user: FeedUser | any;
+  onPass?: (user: any) => void;
+  onLike?: (user: any) => void;
+  onSuperLike?: (user: any) => void;
+}) {
+  const [liked, setLiked] = useState(false);
+  const [superLiked, setSuperLiked] = useState(false);
+  const [passed, setPassed] = useState(false);
 
-export function FeedCard({ user }: { user: UserProp }) {
+  const handleLike = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (liked) return;
+    setLiked(true);
+    try {
+      await post('/discovery/like', { userId: user.id, type: 'like' });
+      onLike?.(user);
+    } catch {
+      // Keep optimistic state
+    }
+  };
+
+  const handleSuperLike = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (superLiked) return;
+    setSuperLiked(true);
+    try {
+      await post('/discovery/like', { userId: user.id, type: 'super_like' });
+      onSuperLike?.(user);
+    } catch {
+      // Keep optimistic state
+    }
+  };
+
+  const handlePass = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setPassed(true);
+    onPass?.(user);
+  };
+
+  if (passed) return null;
+
   return (
     <div className="relative w-full aspect-[3/4] rounded-3xl overflow-hidden group shrink-0" style={{ scrollSnapAlign: 'start' }}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -30,18 +74,18 @@ export function FeedCard({ user }: { user: UserProp }) {
         )}
       </div>
 
-      {/* Top right 3-dots */}
+      {/* Top right link to profile */}
       <div className="absolute top-4 right-4">
-        <button className="h-8 w-8 rounded-full bg-black/20 backdrop-blur-md flex items-center justify-center text-white/80 hover:text-white border border-white/10">
+        <Link href={`/app/profile/${user.id}`} className="h-8 w-8 rounded-full bg-black/20 backdrop-blur-md flex items-center justify-center text-white/80 hover:text-white border border-white/10">
            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
-        </button>
+        </Link>
       </div>
       
       {/* Bottom Content */}
       <div className="absolute bottom-4 inset-x-4 flex justify-between items-end">
-        <div className="flex-1 pr-2">
+        <Link href={`/app/profile/${user.id}`} className="flex-1 pr-2 cursor-pointer">
           <div className="flex items-center gap-1.5 mb-1">
-            <span className="text-xl font-bold tracking-tight text-white drop-shadow-sm">{user.displayName}, {user.age}</span>
+            <span className="text-xl font-bold tracking-tight text-white drop-shadow-sm">{user.displayName}{user.age ? `, ${user.age}` : ''}</span>
             {user.isVerified && <VerifiedIcon size={16} />}
           </div>
           <p className="text-[13px] text-white/80 font-medium mb-3">
@@ -55,17 +99,17 @@ export function FeedCard({ user }: { user: UserProp }) {
               </span>
             ))}
           </div>
-        </div>
+        </Link>
         
         {/* Actions inside card */}
         <div className="flex flex-col gap-3 shrink-0">
-          <button className="h-10 w-10 rounded-full bg-[#1a1a1c] border border-white/10 shadow-lg flex items-center justify-center text-white/70 hover:text-white transition-transform active:scale-95">
+          <button onClick={handlePass} title="Pass" className="h-10 w-10 rounded-full bg-[#1a1a1c] border border-white/10 shadow-lg flex items-center justify-center text-white/70 hover:text-white transition-transform active:scale-95">
              <CloseIcon size={18} className="stroke-[3px]" />
           </button>
-          <button className="h-10 w-10 rounded-full bg-[#FF4DBD] border-2 border-surface shadow-[0_0_15px_rgba(255,77,189,0.5)] flex items-center justify-center text-white transition-transform active:scale-95">
+          <button onClick={handleLike} title="Like" className={`h-10 w-10 rounded-full border-2 border-surface shadow-[0_0_15px_rgba(255,77,189,0.5)] flex items-center justify-center transition-transform active:scale-95 ${liked ? 'bg-[#FF4DBD] text-white scale-105' : 'bg-[#FF4DBD]/90 text-white hover:bg-[#FF4DBD]'}`}>
              <HeartIcon size={20} className="fill-current" />
           </button>
-          <button className="h-10 w-10 rounded-full bg-blue-500/20 border border-blue-500/50 shadow-[0_0_10px_rgba(59,130,246,0.2)] flex items-center justify-center text-blue-400 transition-transform active:scale-95">
+          <button onClick={handleSuperLike} title="Super Like" className={`h-10 w-10 rounded-full border border-blue-500/50 shadow-[0_0_10px_rgba(59,130,246,0.2)] flex items-center justify-center transition-transform active:scale-95 ${superLiked ? 'bg-blue-500 text-white scale-105' : 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30'}`}>
              <StarIcon size={18} className="fill-current" />
           </button>
         </div>
