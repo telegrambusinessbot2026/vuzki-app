@@ -38,21 +38,9 @@ const GoogleIcon = () => (
   </svg>
 );
 
-const AppleIcon = () => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-    <path d="M17.05 16.48c-.02.06-2.6 9-7.25 9-2.22 0-3.08-1.37-5.63-1.37-2.5 0-3.5 1.35-5.58 1.35-4.8 0-7.85-9.67-4.48-15.52 1.6-2.78 4.45-4.52 7.42-4.55 2.37-.02 4.6 1.62 5.85 1.62 1.25 0 3.8-1.92 6.57-1.65 1.15.05 4.38.45 6.45 3.48-5.32 3.1-4.45 10.6.9 12.75-.43 1.1-.98 2.22-1.6 3.28h-1.68v-.02l-1.6.02v-3.23l-3.32-.02-.13-5.23zm-3.15-13.8a6.38 6.38 0 0 0 1.5-4.68 6.55 6.55 0 0 0-4.22 2.18 6.13 6.13 0 0 0-1.55 4.5 5.25 5.25 0 0 0 4.27-2z" transform="scale(0.85) translate(2.5, 1)" />
-  </svg>
-);
-
-const FacebookIcon = () => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="#1877F2" xmlns="http://www.w3.org/2000/svg">
-    <path d="M24 12.07C24 5.41 18.63 0 12 0S0 5.4 0 12.07C0 18.1 4.39 23.1 10.13 24v-8.44H7.08v-3.49h3.04V9.41c0-3.02 1.8-4.7 4.54-4.7 1.31 0 2.68.24 2.68.24v2.97h-1.5c-1.5 0-1.96.93-1.96 1.89v2.26h3.32l-.53 3.5h-2.8V24C19.62 23.1 24 18.1 24 12.07z" />
-  </svg>
-);
-
 export default function LoginPage() {
   const router = useRouter();
-  const { login, loginWithGoogle, loginWithApple, loginWithFacebook } = useAuth();
+  const { login, loginWithGoogle } = useAuth();
 
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
@@ -189,30 +177,15 @@ export default function LoginPage() {
             <div className="flex-1 h-[1px] bg-white/10" />
           </div>
 
-          <div className="grid grid-cols-3 gap-4 mt-6 mb-8">
+          <div className="mt-6 mb-8">
             <button
               type="button"
               onClick={() => handleSocialAuth(loginWithGoogle, 'Google')}
-              className="flex items-center justify-center h-14 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 active:scale-95 transition-all"
-              title="Sign in with Google"
+              className="w-full flex items-center justify-center gap-3 h-14 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 active:scale-95 transition-all text-white font-sans font-medium text-sm"
+              title="Continue with Google"
             >
               <GoogleIcon />
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSocialAuth(loginWithApple, 'Apple')}
-              className="flex items-center justify-center h-14 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 active:scale-95 transition-all"
-              title="Sign in with Apple"
-            >
-              <AppleIcon />
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSocialAuth(loginWithFacebook, 'Facebook')}
-              className="flex items-center justify-center h-14 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 active:scale-95 transition-all"
-              title="Sign in with Facebook"
-            >
-              <FacebookIcon />
+              <span>Continue with Google</span>
             </button>
           </div>
 

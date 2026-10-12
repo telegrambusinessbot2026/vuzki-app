@@ -50,8 +50,6 @@ interface AuthContextType {
   sendOtp: (identifier: string, purpose: string) => Promise<void>;
   verifyOtp: (identifier: string, otp: string, purpose: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
-  loginWithApple: () => Promise<void>;
-  loginWithFacebook: () => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
   updateUser: (u: AuthUser) => void;
@@ -135,32 +133,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const loginWithGoogle = useCallback(async () => {
     const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-    if (!clientId) throw new Error('Google OAuth is BLOCKED: Missing NEXT_PUBLIC_GOOGLE_CLIENT_ID environment variable.');
+    if (!clientId) {
+      throw new Error('Google OAuth is not configured: Missing NEXT_PUBLIC_GOOGLE_CLIENT_ID environment variable.');
+    }
     const state = generateRandomString();
     const nonce = generateRandomString();
     window.sessionStorage.setItem('oauth_state', state);
     window.sessionStorage.setItem('oauth_nonce', nonce);
-    const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(window.location.origin + '/auth/callback/google')}&response_type=id_token&scope=email profile&state=${state}&nonce=${nonce}`;
-    window.location.href = url;
-  }, []);
 
-  const loginWithApple = useCallback(async () => {
-    const clientId = process.env.NEXT_PUBLIC_APPLE_CLIENT_ID;
-    if (!clientId) throw new Error('Apple OAuth is BLOCKED: Missing NEXT_PUBLIC_APPLE_CLIENT_ID environment variable.');
-    const state = generateRandomString();
-    const nonce = generateRandomString();
-    window.sessionStorage.setItem('oauth_state', state);
-    window.sessionStorage.setItem('oauth_nonce', nonce);
-    const url = `https://appleid.apple.com/auth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(window.location.origin + '/auth/callback/apple')}&response_type=id_token&response_mode=fragment&state=${state}&nonce=${nonce}`;
-    window.location.href = url;
-  }, []);
+    const origin = (typeof window !== 'undefined' && window.location.origin)
+      ? window.location.origin.replace(/\/+$/, '')
+      : (process.env.NEXT_PUBLIC_SITE_URL || 'https://vuzki.app').replace(/\/+$/, '');
+    const redirectUri = `${origin}/auth/callback/google`;
 
-  const loginWithFacebook = useCallback(async () => {
-    const clientId = process.env.NEXT_PUBLIC_FACEBOOK_CLIENT_ID;
-    if (!clientId) throw new Error('Facebook OAuth is BLOCKED: Missing NEXT_PUBLIC_FACEBOOK_CLIENT_ID environment variable.');
-    const state = generateRandomString();
-    window.sessionStorage.setItem('oauth_state', state);
-    const url = `https://www.facebook.com/v17.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(window.location.origin + '/auth/callback/facebook')}&response_type=token&scope=email,public_profile&state=${state}`;
+    const params = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      response_type: 'id_token',
+      scope: 'openid email profile',
+      state,
+      nonce,
+      prompt: 'select_account',
+    });
+
+    const url = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
     window.location.href = url;
   }, []);
 
@@ -186,8 +182,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         sendOtp,
         verifyOtp,
         loginWithGoogle,
-        loginWithApple,
-        loginWithFacebook,
         logout,
         refresh,
         updateUser,

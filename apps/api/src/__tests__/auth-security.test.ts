@@ -52,10 +52,9 @@ vi.mock('../middleware/auth', () => ({
 // Mock oauth
 vi.mock('../services/oauth', () => ({
   verifyGoogleToken: vi.fn(),
-  verifyAppleToken: vi.fn(),
 }));
 
-import { verifyGoogleToken, verifyAppleToken } from '../services/oauth';
+import { verifyGoogleToken } from '../services/oauth';
 
 function buildApp() {
   const app = express();
@@ -114,30 +113,55 @@ describe('Authentication Security', () => {
       expect(res.status).toBe(201);
       expect(res.body.success).toBe(true);
     });
-  });
-
-  describe('Apple OAuth Security', () => {
-    it('rejects forged providerId without token', async () => {
-      const res = await request(buildApp()).post('/api/v1/auth/register').send({
-        provider: 'apple',
-        providerId: 'forged_apple_id',
-        gender: 'MALE',
-        dob: '1990-01-01',
+    it('links account and logs in when user already exists with matching verified Google email', async () => {
+      vi.mocked(verifyGoogleToken).mockResolvedValueOnce({
+        providerId: 'google_existing_123',
+        email: 'existing_user@example.com',
+        name: 'Existing User',
       });
-      expect(res.status).toBe(400);
-      expect(res.body.error.code).toBe('TOKEN_REQUIRED');
-    });
-
-    it('rejects invalid Apple token', async () => {
-      vi.mocked(verifyAppleToken).mockRejectedValueOnce(new Error('Invalid token'));
-      const res = await request(buildApp()).post('/api/v1/auth/register').send({
-        provider: 'apple',
-        token: 'invalid_apple_jwt',
-        gender: 'MALE',
-        dob: '1990-01-01',
+      const mockExistingUser = {
+        id: 'u_existing',
+        email: 'existing_user@example.com',
+        provider: 'local',
+        providerId: null,
+        premiumTier: 'FREE',
+        premiumExpiresAt: null,
+        onboardingStep: 'COMPLETE',
+      };
+      // User not found by providerId
+      mocks.userFindFirst.mockResolvedValueOnce(null);
+      // User found by email
+      mocks.userFindUnique.mockResolvedValueOnce(mockExistingUser);
+      // Update returns updated user
+      mocks.userUpdate.mockResolvedValueOnce({
+        ...mockExistingUser,
+        provider: 'google',
+        providerId: 'google_existing_123',
+        emailVerified: true,
       });
-      expect(res.status).toBe(401);
-      expect(res.body.error.code).toBe('INVALID_OAUTH_TOKEN');
+      // loginExistingUser calls findUnique with include: { profile: true, ... }
+      mocks.userFindUnique.mockResolvedValueOnce({
+        ...mockExistingUser,
+        provider: 'google',
+        providerId: 'google_existing_123',
+        emailVerified: true,
+      });
+
+      const res = await request(buildApp()).post('/api/v1/auth/register').send({
+        provider: 'google',
+        token: 'valid_google_token_for_existing',
+      });
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.user.id).toBe('u_existing');
+      expect(mocks.userUpdate).toHaveBeenCalledWith(expect.objectContaining({
+        where: { id: 'u_existing' },
+        data: expect.objectContaining({
+          authProvider: 'google',
+          providerId: 'google_existing_123',
+          emailVerified: true,
+        }),
+      }));
     });
   });
 

@@ -126,13 +126,9 @@ export const config = {
   twilioAuthToken: process.env.TWILIO_AUTH_TOKEN || '',
   twilioServiceSid: process.env.TWILIO_SERVICE_SID || '',
 
-  // Google / Apple OAuth
-  googleClientId: process.env.GOOGLE_CLIENT_ID || '',
+  // Google OAuth
+  googleClientId: process.env.GOOGLE_CLIENT_ID || process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '',
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
-  appleClientId: process.env.APPLE_CLIENT_ID || '',
-  appleTeamId: process.env.APPLE_TEAM_ID || '',
-  appleKeyId: process.env.APPLE_KEY_ID || '',
-  applePrivateKey: process.env.APPLE_PRIVATE_KEY || '',
 
   // Payments
   paymentProvider: process.env.PAYMENT_PROVIDER || (isProd ? 'phonepe' : 'demo'), // demo | razorpay | phonepe | cashfree | stripe

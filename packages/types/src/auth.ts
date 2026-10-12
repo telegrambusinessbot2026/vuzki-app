@@ -29,7 +29,7 @@ export interface RegisterPayload {
   phone?: string;
   password?: string;
   otp?: string;
-  provider?: 'local' | 'google' | 'apple';
+  provider?: 'local' | 'google';
   providerId?: string;
   name?: string;
 }

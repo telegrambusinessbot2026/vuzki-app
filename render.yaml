@@ -82,10 +82,6 @@ services:
         value: https://vuzki.app
       - key: NEXT_PUBLIC_GOOGLE_CLIENT_ID
         sync: false
-      - key: NEXT_PUBLIC_APPLE_CLIENT_ID
-        sync: false
-      - key: NEXT_PUBLIC_FACEBOOK_CLIENT_ID
-        sync: false
       - key: NEXT_PUBLIC_FIREBASE_API_KEY
         sync: false
       - key: NEXT_PUBLIC_FIREBASE_PROJECT_ID
@@ -135,18 +131,6 @@ services:
       - key: GOOGLE_CLIENT_ID
         sync: false
       - key: GOOGLE_CLIENT_SECRET
-        sync: false
-      - key: APPLE_CLIENT_ID
-        sync: false
-      - key: APPLE_TEAM_ID
-        sync: false
-      - key: APPLE_KEY_ID
-        sync: false
-      - key: APPLE_PRIVATE_KEY
-        sync: false
-      - key: FACEBOOK_APP_ID
-        sync: false
-      - key: FACEBOOK_APP_SECRET
         sync: false
 
       # ---- Push Notifications (Firebase Admin) ----

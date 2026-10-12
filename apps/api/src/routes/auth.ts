@@ -17,7 +17,7 @@ import {
   WalletTransactionType,
   MIN_AGE,
 } from '@vuzki/shared';
-import { verifyGoogleToken, verifyAppleToken, verifyFacebookToken } from '../services/oauth';
+import { verifyGoogleToken } from '../services/oauth';
 
 export const authRoutes = Router();
 
@@ -25,12 +25,12 @@ const registerSchema = z.object({
   email: z.string().email().transform(v => v.trim().toLowerCase()).optional(),
   phone: z.string().optional(),
   password: z.string().min(8).optional(),
-  provider: z.enum(['local', 'google', 'apple', 'facebook']).default('local'),
+  provider: z.enum(['local', 'google']).default('local'),
   token: z.string().optional(), // Secure OAuth token
   providerId: z.string().optional(), // Legacy support
   name: z.string().optional(),
   username: z.string().optional(),
-  gender: z.enum(['MALE', 'FEMALE', 'PREFER_NOT_TO_SAY', 'NON_BINARY', 'OTHER']),
+  gender: z.enum(['MALE', 'FEMALE', 'PREFER_NOT_TO_SAY', 'NON_BINARY', 'OTHER']).optional(),
   dob: z.string().optional(), // ISO string YYYY-MM-DD
   age: z.number().int().min(18).max(120).optional(), // Legacy support
   countryCode: z.string().max(3).optional(),
@@ -64,34 +64,40 @@ authRoutes.post('/register', rateLimiter(15 * 60 * 1000, 5), wrap(async (req, re
     if (body.email && !isValidEmail(body.email)) throw new ApiErrorResponse(400, 'INVALID_EMAIL', 'Invalid email');
     if (body.email && !body.email.endsWith('@gmail.com')) throw new ApiErrorResponse(400, 'INVALID_EMAIL_DOMAIN', 'Only Gmail addresses are allowed');
     if (body.phone && !isValidPhone(body.phone)) throw new ApiErrorResponse(400, 'INVALID_PHONE', 'Invalid phone');
-  } else if (body.provider === 'google' || body.provider === 'apple' || body.provider === 'facebook') {
+  } else if (body.provider === 'google') {
     if (!body.token) throw new ApiErrorResponse(400, 'TOKEN_REQUIRED', 'OAuth token is required for social login');
     
     try {
-      if (body.provider === 'google') {
-        const decoded = await verifyGoogleToken(body.token);
-        body.providerId = decoded.providerId;
-        if (decoded.email) body.email = decoded.email;
-        if (decoded.name && !body.name) body.name = decoded.name;
-      } else if (body.provider === 'apple') {
-        const decoded = await verifyAppleToken(body.token);
-        body.providerId = decoded.providerId;
-        if (decoded.email) body.email = decoded.email;
-      } else if (body.provider === 'facebook') {
-        const decoded = await verifyFacebookToken(body.token);
-        body.providerId = decoded.providerId;
-        if (decoded.email) body.email = decoded.email;
-        if (decoded.name && !body.name) body.name = decoded.name;
-      }
-    } catch (err) {
-      throw new ApiErrorResponse(401, 'INVALID_OAUTH_TOKEN', 'Failed to verify OAuth token');
+      const decoded = await verifyGoogleToken(body.token);
+      body.providerId = decoded.providerId;
+      if (decoded.email) body.email = decoded.email;
+      if (decoded.name && !body.name) body.name = decoded.name;
+    } catch (err: any) {
+      throw new ApiErrorResponse(401, 'INVALID_OAUTH_TOKEN', err?.message || 'Failed to verify OAuth token');
     }
     
     if (!body.providerId) throw new ApiErrorResponse(400, 'PROVIDER_ID_REQUIRED', 'Provider ID missing from token');
     
-    const existing = await prisma.user.findFirst({ where: { authProvider: body.provider, providerId: body.providerId } });
+    // 1. Existing user by Google providerId:
+    const existing = await prisma.user.findFirst({ where: { authProvider: 'google', providerId: body.providerId } });
     if (existing) {
       return loginExistingUser(res, existing);
+    }
+
+    // 2. Account linking: If user already exists by verified Google email, link providerId and log in
+    if (body.email) {
+      const existingByEmail = await prisma.user.findUnique({ where: { email: body.email } });
+      if (existingByEmail) {
+        const linked = await prisma.user.update({
+          where: { id: existingByEmail.id },
+          data: {
+            authProvider: 'google',
+            providerId: body.providerId,
+            emailVerified: true,
+          },
+        });
+        return loginExistingUser(res, linked);
+      }
     }
   }
 
@@ -124,8 +130,8 @@ authRoutes.post('/register', rateLimiter(15 * 60 * 1000, 5), wrap(async (req, re
     if (!isAdult(dateOfBirth)) {
       throw new ApiErrorResponse(403, 'UNDERAGE', `You must be at least ${MIN_AGE} years old to use VUZKI`);
     }
-  } else {
-    // Missing DOB/age is completely rejected for all new accounts.
+  } else if (body.provider === 'local') {
+    // Missing DOB/age is completely rejected for local accounts.
     throw new ApiErrorResponse(400, 'DOB_REQUIRED', 'Date of birth is required');
   }
 
@@ -137,14 +143,15 @@ authRoutes.post('/register', rateLimiter(15 * 60 * 1000, 5), wrap(async (req, re
     data: {
       email: body.email || null,
       phone: body.phone || null,
-      passwordHash: body.provider === 'local' ? await hashPassword(body.password!) : null,
+      passwordHash: body.provider === 'local' && body.password ? await hashPassword(body.password) : null,
       authProvider: body.provider,
       providerId: body.providerId,
       username,
       displayName: body.name || username,
-      gender: body.gender || undefined,
+      gender: body.gender || 'PREFER_NOT_TO_SAY',
       countryCode: body.countryCode || undefined,
       dateOfBirth: dateOfBirth || undefined,
+      emailVerified: body.provider === 'google' ? true : false,
       referralCode: generateReferralCode(),
       referredById: referrer?.id || null,
       onboardingStep: OnboardingStep.NONE,
