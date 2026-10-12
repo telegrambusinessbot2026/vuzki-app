@@ -31,7 +31,13 @@ export interface RegisterPayload {
   otp?: string;
   provider?: 'local' | 'google';
   providerId?: string;
+  token?: string;
   name?: string;
+  username?: string;
+  dob?: string;
+  gender?: Gender | 'MALE' | 'FEMALE';
+  countryCode?: string;
+  referralCode?: string;
 }
 
 export interface LoginPayload {

@@ -54,7 +54,14 @@ vi.mock('../services/oauth', () => ({
   verifyGoogleToken: vi.fn(),
 }));
 
+// Mock otp
+vi.mock('../services/otp', () => ({
+  sendOtp: vi.fn().mockResolvedValue({ sent: true }),
+  verifyOtp: vi.fn().mockResolvedValue(true),
+}));
+
 import { verifyGoogleToken } from '../services/oauth';
+import { sendOtp, verifyOtp } from '../services/otp';
 
 function buildApp() {
   const app = express();
@@ -68,6 +75,184 @@ function buildApp() {
 describe('Authentication Security', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  describe('Registration Form Validation & Email OTP', () => {
+    it('sends registration OTP only to valid Gmail and never to phone', async () => {
+      mocks.userFindUnique.mockResolvedValueOnce(null);
+      const res = await request(buildApp()).post('/api/v1/auth/send-otp').send({
+        identifier: 'newuser@gmail.com',
+        purpose: 'registration',
+      });
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(sendOtp).toHaveBeenCalledWith('newuser@gmail.com', 'registration');
+    });
+
+    it('rejects registration OTP for non-gmail addresses', async () => {
+      const res = await request(buildApp()).post('/api/v1/auth/send-otp').send({
+        identifier: 'newuser@yahoo.com',
+        purpose: 'registration',
+      });
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('INVALID_EMAIL_DOMAIN');
+    });
+
+    it('rejects sending registration OTP to phone numbers', async () => {
+      const res = await request(buildApp()).post('/api/v1/auth/send-otp').send({
+        identifier: '+919876543210',
+        purpose: 'registration',
+      });
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('INVALID_EMAIL');
+    });
+
+    it('rejects registration without OTP', async () => {
+      const res = await request(buildApp()).post('/api/v1/auth/register').send({
+        provider: 'local',
+        name: 'Test User',
+        email: 'testuser@gmail.com',
+        phone: '+919876543210',
+        password: 'Password123!',
+        dob: '2000-01-01',
+        gender: 'MALE',
+      });
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('OTP_REQUIRED');
+    });
+
+    it('rejects registration with invalid or expired OTP', async () => {
+      vi.mocked(verifyOtp).mockRejectedValueOnce(new Error('OTP_EXPIRED'));
+      const res = await request(buildApp()).post('/api/v1/auth/register').send({
+        provider: 'local',
+        name: 'Test User',
+        email: 'testuser@gmail.com',
+        phone: '+919876543210',
+        password: 'Password123!',
+        dob: '2000-01-01',
+        gender: 'MALE',
+        otp: '123456',
+      });
+      expect(res.status).toBe(401);
+      expect(res.body.error.code).toBe('OTP_EXPIRED');
+    });
+
+    it('rejects duplicate phone number during registration', async () => {
+      vi.mocked(verifyOtp).mockResolvedValueOnce(true);
+      mocks.userFindUnique.mockResolvedValueOnce(null); // email available
+      mocks.userFindUnique.mockResolvedValueOnce({ id: 'u_phone_holder', phone: '+919876543210' }); // phone taken
+
+      const res = await request(buildApp()).post('/api/v1/auth/register').send({
+        provider: 'local',
+        name: 'Test User',
+        email: 'newuser@gmail.com',
+        phone: '+919876543210',
+        password: 'Password123!',
+        dob: '2000-01-01',
+        gender: 'MALE',
+        otp: '123456',
+      });
+      expect(res.status).toBe(409);
+      expect(res.body.error.code).toBe('PHONE_EXISTS');
+    });
+
+    it('successfully registers adult user with valid email OTP and normalized mobile number', async () => {
+      vi.mocked(verifyOtp).mockResolvedValueOnce(true);
+      mocks.userFindUnique.mockResolvedValueOnce(null); // email available
+      mocks.userFindUnique.mockResolvedValueOnce(null); // phone available
+      mocks.userFindUnique.mockResolvedValueOnce(null); // username available
+      mocks.userCreate.mockResolvedValueOnce({
+        id: 'u_new',
+        email: 'newuser@gmail.com',
+        phone: '+919876543210',
+        displayName: 'Test User',
+        emailVerified: true,
+      });
+
+      const res = await request(buildApp()).post('/api/v1/auth/register').send({
+        provider: 'local',
+        name: 'Test User',
+        email: 'newuser@gmail.com',
+        phone: '9876543210', // 10 digit Indian number
+        countryCode: '+91',
+        password: 'Password123!',
+        dob: '2000-01-01',
+        gender: 'MALE',
+        otp: '123456',
+      });
+      expect(res.status).toBe(201);
+      expect(res.body.success).toBe(true);
+      expect(mocks.userCreate).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({
+          email: 'newuser@gmail.com',
+          phone: '+919876543210',
+          emailVerified: true,
+          gender: 'MALE',
+        }),
+      }));
+    });
+  });
+
+  describe('Mobile & Email Login', () => {
+    it('sends login OTP to registered email when mobile number is provided without revealing account existence', async () => {
+      // User exists with phone and email
+      mocks.userFindUnique.mockResolvedValueOnce({
+        id: 'u_phone_user',
+        email: 'phoneuser@gmail.com',
+        phone: '+919876543210',
+      });
+
+      const res = await request(buildApp()).post('/api/v1/auth/send-otp').send({
+        identifier: '+919876543210',
+        purpose: 'login',
+      });
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      // verify sendOtp received normalized phone as identifier and user.email as recipientEmail
+      expect(sendOtp).toHaveBeenCalledWith('+919876543210', 'login', 'phoneuser@gmail.com');
+    });
+
+    it('returns generic success when mobile number does not exist to avoid user enumeration', async () => {
+      mocks.userFindUnique.mockResolvedValueOnce(null);
+
+      const res = await request(buildApp()).post('/api/v1/auth/send-otp').send({
+        identifier: '+919999999999',
+        purpose: 'login',
+      });
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(sendOtp).not.toHaveBeenCalled();
+    });
+
+    it('logs in successfully using mobile number and verified OTP', async () => {
+      vi.mocked(verifyOtp).mockResolvedValueOnce(true);
+      mocks.userFindFirst.mockResolvedValueOnce({
+        id: 'u_phone_user',
+        email: 'phoneuser@gmail.com',
+        phone: '+919876543210',
+        status: 'ACTIVE',
+        premiumTier: 'FREE',
+        premiumExpiresAt: null,
+        onboardingStep: 'COMPLETE',
+      });
+      mocks.userFindUnique.mockResolvedValueOnce({
+        id: 'u_phone_user',
+        email: 'phoneuser@gmail.com',
+        phone: '+919876543210',
+        status: 'ACTIVE',
+        premiumTier: 'FREE',
+        premiumExpiresAt: null,
+        onboardingStep: 'COMPLETE',
+      });
+
+      const res = await request(buildApp()).post('/api/v1/auth/login').send({
+        identifier: '+919876543210',
+        otp: '654321',
+      });
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(verifyOtp).toHaveBeenCalledWith('+919876543210', '654321', 'login');
+    });
   });
 
   describe('Google OAuth Security', () => {
@@ -113,6 +298,7 @@ describe('Authentication Security', () => {
       expect(res.status).toBe(201);
       expect(res.body.success).toBe(true);
     });
+
     it('links account and logs in when user already exists with matching verified Google email', async () => {
       vi.mocked(verifyGoogleToken).mockResolvedValueOnce({
         providerId: 'google_existing_123',
@@ -170,37 +356,25 @@ describe('Authentication Security', () => {
       const res = await request(buildApp()).post('/api/v1/auth/register').send({
         provider: 'local',
         email: 'underage@gmail.com',
+        phone: '+919876543210',
         password: 'Password123!',
         dob: new Date().toISOString(), // Today (0 years old)
         gender: 'MALE',
+        otp: '123456',
       });
       expect(res.status).toBe(403);
       expect(res.body.error.code).toBe('UNDERAGE');
-    });
-
-    it('accepts valid adult registration (DOB)', async () => {
-      mocks.userFindUnique.mockResolvedValueOnce(null); // check email
-      mocks.userCreate.mockResolvedValueOnce({ id: 'u1' });
-      
-      const res = await request(buildApp()).post('/api/v1/auth/register').send({
-        provider: 'local',
-        email: 'adult@gmail.com',
-        password: 'Password123!',
-        dob: '2000-01-01',
-        gender: 'MALE',
-      });
-      if (res.status !== 201) console.log('RESPONSE:', res.body);
-      expect(res.status).toBe(201);
-      expect(res.body.success).toBe(true);
     });
 
     it('rejects future DOB', async () => {
       const res = await request(buildApp()).post('/api/v1/auth/register').send({
         provider: 'local',
         email: 'future@gmail.com',
+        phone: '+919876543210',
         password: 'Password123!',
         dob: '2050-01-01',
         gender: 'MALE',
+        otp: '123456',
       });
       expect(res.status).toBe(403);
       expect(res.body.error.code).toBe('UNDERAGE');

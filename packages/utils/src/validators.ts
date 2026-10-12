@@ -3,8 +3,32 @@ import { MIN_AGE, MAX_AGE } from '@vuzki/shared';
 export const isValidEmail = (email: string): boolean =>
   /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
-export const isValidPhone = (phone: string): boolean =>
-  /^\+?[1-9]\d{7,14}$/.test(phone.replace(/[\s-]/g, ''));
+/**
+ * Normalizes phone numbers with country code.
+ * E.g., removes spaces, dashes, parentheses. If it starts with digits and defaultCountryCode is provided, adds '+'.
+ */
+export const normalizePhoneNumber = (phone: string, defaultCountryCode = '+91'): string => {
+  let cleaned = phone.replace(/[\s\-()]/g, '');
+  if (!cleaned) return '';
+  if (cleaned.startsWith('00')) {
+    cleaned = '+' + cleaned.slice(2);
+  }
+  if (!cleaned.startsWith('+')) {
+    // If 10 digits (standard Indian mobile format) and defaultCountryCode provided
+    if (/^\d{10}$/.test(cleaned) && defaultCountryCode) {
+      cleaned = `${defaultCountryCode.startsWith('+') ? defaultCountryCode : '+' + defaultCountryCode}${cleaned}`;
+    } else {
+      cleaned = '+' + cleaned;
+    }
+  }
+  return cleaned;
+};
+
+export const isValidPhone = (phone: string): boolean => {
+  const normalized = normalizePhoneNumber(phone);
+  // Valid E.164 phone format: + followed by 7 to 15 digits
+  return /^\+[1-9]\d{6,14}$/.test(normalized);
+};
 
 export const isValidPassword = (password: string): boolean =>
   password.length >= 8 && /\d/.test(password) && /[A-Za-z]/.test(password);

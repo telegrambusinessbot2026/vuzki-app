@@ -105,4 +105,14 @@ describe('otp: verifyOtp brute-force protection', () => {
     await expect(verifyOtp('a', '123456', 'login')).rejects.toThrow('OTP_EXPIRED');
     expect(mocks.otpUpdate).not.toHaveBeenCalled();
   });
+
+  it('rejects already consumed OTP', async () => {
+    // findFirst with consumed: false returns null
+    mocks.otpFindFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null); // incrementAttempts also finds no active OTP
+
+    await expect(verifyOtp('a', '123456', 'login')).rejects.toThrow('INVALID_OTP');
+    expect(mocks.otpUpdate).not.toHaveBeenCalled();
+  });
 });

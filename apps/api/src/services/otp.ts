@@ -17,7 +17,23 @@ export async function createAndValidateOtp(identifier: string, purpose: string) 
   return null;
 }
 
-export async function sendOtp(identifier: string, purpose: 'registration' | 'login' | 'password_reset') {
+export async function sendOtp(identifier: string, purpose: 'registration' | 'login' | 'password_reset', recipientEmail?: string) {
+  // Check for active OTP to enforce resend cooldown and maximum attempts
+  const latestOtp = await prisma.otp.findFirst({
+    where: { identifier, purpose, consumed: false },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  if (latestOtp) {
+    if (latestOtp.attempts >= OTP_MAX_ATTEMPTS) {
+      throw new Error('OTP_MAX_ATTEMPTS');
+    }
+    const elapsedSeconds = (Date.now() - latestOtp.createdAt.getTime()) / 1000;
+    if (elapsedSeconds < 60) {
+      throw new Error('OTP_COOLDOWN');
+    }
+  }
+
   const code = generateOtp(6);
   const codeHash = crypto.createHash('sha256').update(code).digest('hex');
   await prisma.otp.create({
@@ -42,8 +58,9 @@ export async function sendOtp(identifier: string, purpose: 'registration' | 'log
     console.log(`[VUZKI OTP][${purpose}] ${identifier}: ${code}`);
   }
 
-  if (identifier.includes('@')) {
-    await sendEmailOtp(identifier, code, purpose);
+  const targetEmail = recipientEmail || (identifier.includes('@') ? identifier : null);
+  if (targetEmail) {
+    await sendEmailOtp(targetEmail, code, purpose);
   }
   return { sent: true };
 }

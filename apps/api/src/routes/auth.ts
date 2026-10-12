@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '@vuzki/database';
 import { ApiErrorResponse } from '@vuzki/types';
-import { hashPassword, verifyPassword, generateReferralCode, isValidEmail, isValidPhone, isValidPassword, isValidOtp, isAdult } from '@vuzki/utils';
+import { hashPassword, verifyPassword, generateReferralCode, isValidEmail, isValidPhone, normalizePhoneNumber, isValidPassword, isValidOtp, isAdult } from '@vuzki/utils';
 import { wrap, toSelfUser } from './helpers';
 import { rateLimiter } from '../middleware/rateLimit';
 import { issueTokens, verifyRefreshToken, signRefreshToken } from '../services/jwt';
@@ -30,10 +30,11 @@ const registerSchema = z.object({
   providerId: z.string().optional(), // Legacy support
   name: z.string().optional(),
   username: z.string().optional(),
-  gender: z.enum(['MALE', 'FEMALE', 'PREFER_NOT_TO_SAY', 'NON_BINARY', 'OTHER']).optional(),
+  // Registration strictly accepts MALE or FEMALE. Legacy DB records with other values remain handled.
+  gender: z.enum(['MALE', 'FEMALE']).optional(),
   dob: z.string().optional(), // ISO string YYYY-MM-DD
   age: z.number().int().min(18).max(120).optional(), // Legacy support
-  countryCode: z.string().max(3).optional(),
+  countryCode: z.string().max(4).optional(),
   referralCode: z.string().optional(),
   otp: z.string().optional(),
 });
@@ -45,10 +46,86 @@ authRoutes.post('/send-otp', rateLimiter(15 * 60 * 1000, 8), wrap(async (req, re
     purpose: z.enum(['registration', 'login', 'password_reset']),
   }).parse(req.body);
 
+  if (purpose === 'registration') {
+    // Registration OTP must be sent ONLY to a valid email address
+    if (!isValidEmail(identifier)) {
+      throw new ApiErrorResponse(400, 'INVALID_EMAIL', 'Registration OTP must be sent to a valid email address');
+    }
+    if (!identifier.endsWith('@gmail.com')) {
+      throw new ApiErrorResponse(400, 'INVALID_EMAIL_DOMAIN', 'Only Gmail addresses are allowed');
+    }
+    // Check if email already registered to prevent duplicate accounts
+    const existing = await prisma.user.findUnique({ where: { email: identifier } });
+    if (existing) {
+      throw new ApiErrorResponse(409, 'ACCOUNT_EXISTS', 'An account with this email already exists');
+    }
+    try {
+      await sendOtp(identifier, 'registration');
+    } catch (err: any) {
+      if (err?.message === 'OTP_COOLDOWN') {
+        throw new ApiErrorResponse(429, 'OTP_COOLDOWN', 'Please wait 60 seconds before requesting another code.');
+      }
+      if (err?.message === 'OTP_MAX_ATTEMPTS') {
+        throw new ApiErrorResponse(429, 'OTP_MAX_ATTEMPTS', 'Too many attempts. Please try again later.');
+      }
+      throw err;
+    }
+    return res.json({ success: true, data: { sent: true } });
+  }
+
+  if (purpose === 'login') {
+    // If identifier is a phone number, locate user and send OTP to their verified email
+    if (isValidPhone(identifier)) {
+      const normalizedPhone = normalizePhoneNumber(identifier);
+      const user = await prisma.user.findUnique({ where: { phone: normalizedPhone } });
+      if (!user || !user.email) {
+        // Return generic success to never reveal account existence
+        return res.json({ success: true, data: { sent: true } });
+      }
+      // Send OTP to user's registered email using phone as OTP identifier
+      try {
+        await sendOtp(normalizedPhone, 'login', user.email);
+      } catch (err: any) {
+        if (err?.message === 'OTP_COOLDOWN') {
+          throw new ApiErrorResponse(429, 'OTP_COOLDOWN', 'Please wait 60 seconds before requesting another code.');
+        }
+        if (err?.message === 'OTP_MAX_ATTEMPTS') {
+          throw new ApiErrorResponse(429, 'OTP_MAX_ATTEMPTS', 'Too many attempts. Please try again later.');
+        }
+        throw err;
+      }
+      return res.json({ success: true, data: { sent: true } });
+    }
+
+    if (isValidEmail(identifier)) {
+      const user = await prisma.user.findUnique({ where: { email: identifier } });
+      if (!user) {
+        // Don't reveal account existence
+        return res.json({ success: true, data: { sent: true } });
+      }
+      try {
+        await sendOtp(identifier, 'login');
+      } catch (err: any) {
+        if (err?.message === 'OTP_COOLDOWN') {
+          throw new ApiErrorResponse(429, 'OTP_COOLDOWN', 'Please wait 60 seconds before requesting another code.');
+        }
+        if (err?.message === 'OTP_MAX_ATTEMPTS') {
+          throw new ApiErrorResponse(429, 'OTP_MAX_ATTEMPTS', 'Too many attempts. Please try again later.');
+        }
+        throw err;
+      }
+      return res.json({ success: true, data: { sent: true } });
+    }
+
+    throw new ApiErrorResponse(400, 'INVALID_IDENTIFIER', 'Provide a valid email or phone number');
+  }
+
+  // password_reset
   if (!isValidEmail(identifier) && !isValidPhone(identifier)) {
     throw new ApiErrorResponse(400, 'INVALID_IDENTIFIER', 'Provide a valid email or phone');
   }
-  await sendOtp(identifier, purpose);
+  const resetTarget = isValidPhone(identifier) ? normalizePhoneNumber(identifier) : identifier;
+  await sendOtp(resetTarget, purpose);
   res.json({ success: true, data: { sent: true } });
 }));
 
@@ -57,13 +134,27 @@ authRoutes.post('/register', rateLimiter(15 * 60 * 1000, 5), wrap(async (req, re
   const body = registerSchema.parse(req.body);
 
   if (body.provider === 'local') {
-    if (!body.email && !body.phone) throw new ApiErrorResponse(400, 'IDENTIFIER_REQUIRED', 'Email or phone is required');
+    if (!body.email) throw new ApiErrorResponse(400, 'EMAIL_REQUIRED', 'Email address is required');
+    if (!body.phone) throw new ApiErrorResponse(400, 'PHONE_REQUIRED', 'Mobile number is required');
     if (!body.password || !isValidPassword(body.password)) {
       throw new ApiErrorResponse(400, 'WEAK_PASSWORD', 'Password must be at least 8 chars with letters and numbers');
     }
-    if (body.email && !isValidEmail(body.email)) throw new ApiErrorResponse(400, 'INVALID_EMAIL', 'Invalid email');
-    if (body.email && !body.email.endsWith('@gmail.com')) throw new ApiErrorResponse(400, 'INVALID_EMAIL_DOMAIN', 'Only Gmail addresses are allowed');
-    if (body.phone && !isValidPhone(body.phone)) throw new ApiErrorResponse(400, 'INVALID_PHONE', 'Invalid phone');
+    if (!isValidEmail(body.email)) throw new ApiErrorResponse(400, 'INVALID_EMAIL', 'Invalid email');
+    if (!body.email.endsWith('@gmail.com')) throw new ApiErrorResponse(400, 'INVALID_EMAIL_DOMAIN', 'Only Gmail addresses are allowed');
+    if (!isValidPhone(body.phone)) throw new ApiErrorResponse(400, 'INVALID_PHONE', 'Invalid mobile number. Provide a valid mobile number with country code.');
+    body.phone = normalizePhoneNumber(body.phone, body.countryCode || '+91');
+
+    if (!body.otp) {
+      throw new ApiErrorResponse(400, 'OTP_REQUIRED', 'Email verification OTP is required to register');
+    }
+    if (!isValidOtp(body.otp)) {
+      throw new ApiErrorResponse(400, 'INVALID_OTP', 'Invalid verification OTP format');
+    }
+    await verifyOtp(body.email, body.otp, 'registration').catch((err: any) => {
+      const code = err?.message === 'OTP_EXPIRED' ? 'OTP_EXPIRED' : err?.message === 'OTP_MAX_ATTEMPTS' ? 'OTP_MAX_ATTEMPTS' : 'INVALID_OTP';
+      const msg = err?.message === 'OTP_EXPIRED' ? 'Verification code expired' : err?.message === 'OTP_MAX_ATTEMPTS' ? 'Too many attempts. Request a new code.' : 'Invalid or expired verification code';
+      throw new ApiErrorResponse(401, code, msg);
+    });
   } else if (body.provider === 'google') {
     if (!body.token) throw new ApiErrorResponse(400, 'TOKEN_REQUIRED', 'OAuth token is required for social login');
     
@@ -101,16 +192,22 @@ authRoutes.post('/register', rateLimiter(15 * 60 * 1000, 5), wrap(async (req, re
     }
   }
 
-  const identifier = body.email || body.phone;
-  const existing = body.email
-    ? await prisma.user.findUnique({ where: { email: body.email } })
-    : body.phone
-    ? await prisma.user.findUnique({ where: { phone: body.phone } })
-    : null;
-  if (existing) {
-    throw new ApiErrorResponse(409, 'ACCOUNT_EXISTS', 'An account with this identity already exists', undefined, {
-      identifier: 'Account already exists. Try logging in.',
-    });
+  // Check unique constraints for both email and phone
+  if (body.email) {
+    const existingEmail = await prisma.user.findUnique({ where: { email: body.email } });
+    if (existingEmail) {
+      throw new ApiErrorResponse(409, 'ACCOUNT_EXISTS', 'An account with this email already exists', undefined, {
+        email: 'Email is already registered. Try logging in.',
+      });
+    }
+  }
+  if (body.phone) {
+    const existingPhone = await prisma.user.findUnique({ where: { phone: body.phone } });
+    if (existingPhone) {
+      throw new ApiErrorResponse(409, 'PHONE_EXISTS', 'An account with this mobile number already exists', undefined, {
+        phone: 'Mobile number is already registered. Try logging in.',
+      });
+    }
   }
 
   let username = await generateUniqueUsername((body.username || body.name || 'user').toLowerCase());
@@ -151,7 +248,8 @@ authRoutes.post('/register', rateLimiter(15 * 60 * 1000, 5), wrap(async (req, re
       gender: body.gender || 'PREFER_NOT_TO_SAY',
       countryCode: body.countryCode || undefined,
       dateOfBirth: dateOfBirth || undefined,
-      emailVerified: body.provider === 'google' ? true : false,
+      emailVerified: true, // Email has been verified via OTP or Google OAuth
+      phoneVerified: false,
       referralCode: generateReferralCode(),
       referredById: referrer?.id || null,
       onboardingStep: OnboardingStep.NONE,
@@ -223,15 +321,18 @@ async function loginExistingUser(res: any, user: any) {
 // POST /auth/login
 authRoutes.post('/login', rateLimiter(15 * 60 * 1000, 10), wrap(async (req, res) => {
   const { identifier, password, otp, pushToken } = z.object({
-    identifier: z.string().transform(v => v.trim().toLowerCase()).transform(v => v.trim().toLowerCase()),
+    identifier: z.string().transform(v => v.trim().toLowerCase()),
     password: z.string().optional(),
     otp: z.string().optional(),
     pushToken: z.string().max(500).optional(),
   }).parse(req.body);
 
+  const isPhone = isValidPhone(identifier);
+  const normalizedIdentifier = isPhone ? normalizePhoneNumber(identifier) : identifier;
+
   const user = await prisma.user.findFirst({
     where: {
-      OR: [{ email: identifier }, { phone: identifier }],
+      OR: [{ email: normalizedIdentifier }, { phone: normalizedIdentifier }],
       authProvider: 'local',
     },
   });
@@ -243,8 +344,11 @@ authRoutes.post('/login', rateLimiter(15 * 60 * 1000, 10), wrap(async (req, res)
 
   if (otp) {
     if (!isValidOtp(otp)) throw new ApiErrorResponse(400, 'INVALID_OTP', 'Invalid OTP');
-    await verifyOtp(identifier, otp, 'login').catch(() => {
-      throw new ApiErrorResponse(401, 'INVALID_OTP', 'Invalid or expired OTP');
+    // For mobile login, OTP was dispatched to user's registered email using phone as OTP identifier
+    await verifyOtp(normalizedIdentifier, otp, 'login').catch((err: any) => {
+      const code = err?.message === 'OTP_EXPIRED' ? 'OTP_EXPIRED' : err?.message === 'OTP_MAX_ATTEMPTS' ? 'OTP_MAX_ATTEMPTS' : 'INVALID_OTP';
+      const msg = err?.message === 'OTP_EXPIRED' ? 'Verification code expired' : err?.message === 'OTP_MAX_ATTEMPTS' ? 'Too many attempts. Request a new code.' : 'Invalid or expired OTP';
+      throw new ApiErrorResponse(401, code, msg);
     });
   } else if (password) {
     if (!user.passwordHash || !(await verifyPassword(password, user.passwordHash))) {

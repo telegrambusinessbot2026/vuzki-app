@@ -40,24 +40,68 @@ const GoogleIcon = () => (
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, loginWithGoogle } = useAuth();
+  const { login, sendOtp, loginWithGoogle } = useAuth();
 
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [otp, setOtp] = useState('');
   const [useOtp, setUseOtp] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpCountdown, setOtpCountdown] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (otpCountdown > 0) {
+      const timer = setTimeout(() => setOtpCountdown(otpCountdown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [otpCountdown]);
+
+  const handleRequestOtp = async () => {
+    const cleanId = identifier.trim().toLowerCase();
+    if (!cleanId) {
+      setError('Please enter your email or mobile number first.');
+      return;
+    }
+    setError(null);
+    setSuccess(null);
+    setLoading(true);
+    try {
+      await sendOtp(cleanId, 'login');
+      setOtpSent(true);
+      setOtpCountdown(60);
+      setSuccess('Verification code sent to your registered email address.');
+    } catch (err: any) {
+      setError(err instanceof ApiError ? err.message : (err?.message || 'Failed to send verification code.'));
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setSuccess(null);
+
+    const cleanId = identifier.trim().toLowerCase();
+    if (!cleanId) {
+      setError('Please enter your email address or mobile number.');
+      return;
+    }
+
+    if (useOtp && !otp.trim()) {
+      setError('Please enter the 6-digit verification code.');
+      return;
+    }
+
     setLoading(true);
     try {
-      const authed = await login(identifier.trim().toLowerCase(), useOtp ? undefined : password, useOtp ? otp : undefined);
+      const authed = await login(cleanId, useOtp ? undefined : password, useOtp ? otp.trim() : undefined);
       router.push(authed.needsOnboarding ? '/app/onboarding' : '/app/home');
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to log in. Please try again.');
+      setError(err instanceof ApiError ? err.message : 'Failed to log in. Please check your credentials.');
     } finally {
       setLoading(false);
     }
@@ -75,6 +119,7 @@ export default function LoginPage() {
   const toggleOtp = () => {
     setUseOtp((v) => !v);
     setError(null);
+    setSuccess(null);
   };
 
   return (
@@ -98,31 +143,48 @@ export default function LoginPage() {
           <div className="text-center mb-8">
             <h1 className="text-[28px] font-bold text-white mb-2">Welcome Back</h1>
             <p className="text-[13px] text-white/60 mx-auto max-w-[280px]">
-              Login to continue where you left off
+              Login using your email or mobile number
             </p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-4">
             <Input
               prefix={<MailIcon />}
-              type={useOtp ? 'tel' : 'text'}
-              placeholder={useOtp ? '+1 555 000 1234' : 'Email Address or Phone'}
+              type={useOtp ? 'text' : 'text'}
+              placeholder="Email Address or Mobile (+91)"
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
               required
               className="rounded-xl border-white/10 focus:ring-[#FF2D8F]/50 focus:border-[#FF2D8F]"
             />
             {useOtp ? (
-              <Input
-                prefix={<KeyIcon />}
-                type="text"
-                inputMode="numeric"
-                placeholder="6-digit code"
-                value={otp}
-                onChange={(e) => setOtp(e.target.value)}
-                required
-                className="rounded-xl border-white/10 focus:ring-[#FF2D8F]/50 focus:border-[#FF2D8F]"
-              />
+              <div className="space-y-2">
+                <div className="relative">
+                  <Input
+                    prefix={<KeyIcon />}
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="6-digit verification code"
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value)}
+                    required
+                    className="rounded-xl border-white/10 focus:ring-[#FF2D8F]/50 focus:border-[#FF2D8F] tracking-widest text-center font-bold"
+                  />
+                </div>
+                <div className="flex items-center justify-between px-1">
+                  <span className="text-[11px] text-white/50">
+                    Code sent to linked email
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleRequestOtp}
+                    disabled={loading || otpCountdown > 0}
+                    className="text-xs font-semibold text-[#FF2D8F] hover:text-[#FF006E] transition-colors disabled:opacity-50"
+                  >
+                    {otpCountdown > 0 ? `Resend (${otpCountdown}s)` : otpSent ? 'Resend Code' : 'Send Code'}
+                  </button>
+                </div>
+              </div>
             ) : (
               <PasswordInput
                 prefix={<LockIcon />}
@@ -140,12 +202,18 @@ export default function LoginPage() {
                 onClick={toggleOtp}
                 className="text-xs font-semibold text-[#FF2D8F] hover:text-[#FF006E] transition-colors uppercase tracking-wider"
               >
-                {useOtp ? 'Use password' : 'Use one-time code'}
+                {useOtp ? 'Use password' : 'Use email OTP code'}
               </button>
               <Link href="/auth/forgot-password" className="text-xs font-semibold text-white/40 hover:text-white transition-colors uppercase tracking-wider">
                 Forgot?
               </Link>
             </div>
+
+            {success && (
+              <div className="bg-green-500/10 border border-green-500/20 text-green-400 text-sm font-medium px-4 py-3 rounded-2xl">
+                {success}
+              </div>
+            )}
 
             {error && (
               <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-medium px-4 py-3 rounded-2xl">
